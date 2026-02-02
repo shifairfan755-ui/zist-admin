@@ -1,0 +1,56 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Global Theme */
+body {
+  @apply bg-bgLight text-textDark antialiased;
+}
+
+/* Premium Card Hover Effect */
+.stat-card {
+  @apply transition-all duration-300 transform hover:-translate-y-1 hover:shadow-xl;
+}
+
+/* Gradient Presets */
+.gradient-blue {
+  background: linear-gradient(to right, #1E3A8A, #3B82F6);
+}
+
+.gradient-green {
+  background: linear-gradient(to right, #047857, #10B981);
+}
+
+.gradient-purple {
+  background: linear-gradient(to right, #6D28D9, #A855F7);
+}
+
+.gradient-orange {
+  background: linear-gradient(to right, #EA580C, #F97316);
+}
+
+/* Reusable Card Style */
+.rounded-card {
+  @apply rounded-xl;
+}
+
+.shadow-card {
+  @apply shadow-md;
+}
+
+.transition-smooth {
+  @apply transition-all duration-300 ease-in-out;
+}
+
+/* Table Hover */
+.grayLight {
+  color: #e2e8f0;
+}
+
+.grayDark {
+  color: #334155;
+}
+
+.success {
+  color: #0f9d58;
+}

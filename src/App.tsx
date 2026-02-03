@@ -1,3 +1,4 @@
+// ROUTER UPDATED 2026
 import { Routes, Route, Navigate } from "react-router-dom";
 import { Outlet } from "react-router-dom";
 

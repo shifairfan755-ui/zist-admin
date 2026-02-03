@@ -1,74 +1,77 @@
-import { NavLink } from "react-router-dom";
-import {
-  HomeIcon,
-  UserGroupIcon,
-  ClipboardDocumentListIcon,
-  BanknotesIcon,
-  DocumentDuplicateIcon,
-  ArrowRightOnRectangleIcon,
-  UsersIcon,
-  FolderOpenIcon,
-  ChartPieIcon,
-  InboxStackIcon,
-} from "@heroicons/react/24/outline";
-import { useAuth } from "../context/AuthContext";
+import { NavLink, useNavigate } from "react-router-dom";
+import { supabase } from "../lib/supabaseClient";
+import { 
+  FiHome, FiFilePlus, FiUsers, FiUser, FiFile, FiFileText, 
+  FiFolder, FiUpload, FiSettings
+} from "react-icons/fi";
+import { MdDashboard } from "react-icons/md";
 
 export default function Sidebar() {
-  const { logout } = useAuth();
+  const navigate = useNavigate();
 
-<button onClick={logout} className="...">
-  Logout
-</button>
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    navigate("/");
+  };
 
-  const menuItems = [
-    { label: "Dashboard", icon: HomeIcon, to: "/dashboard" },
-    { label: "New Application", icon: ClipboardDocumentListIcon, to: "/new-application" },
-    { label: "Applications", icon: InboxStackIcon, to: "/applications" },
-    { label: "Beneficiaries", icon: UserGroupIcon, to: "/beneficiaries" },
-    { label: "Payments", icon: BanknotesIcon, to: "/payments" },
-    { label: "Soft Loans", icon: ChartPieIcon, to: "/soft-loans" },
-    { label: "Donors", icon: UsersIcon, to: "/donors" },
-    { label: "Donor Dashboard", icon: ChartPieIcon, to: "/donor-dashboard" },
-    { label: "All Documents", icon: FolderOpenIcon, to: "/documents" },
-    { label: "Upload Documents", icon: DocumentDuplicateIcon, to: "/upload-documents" },
-    { label: "Users", icon: UsersIcon, to: "/users" },
+  const menu = [
+    // MAIN
+    { name: "Dashboard", path: "/dashboard", icon: <FiHome /> },
+    { name: "New Application", path: "/new-application", icon: <FiFilePlus /> },
+    { name: "Applications", path: "/applications", icon: <FiFileText /> },
+    { name: "Beneficiaries", path: "/beneficiaries", icon: <FiUsers /> },
+    { name: "Payments", path: "/payments", icon: <FiFile /> },
+
+    // SOFT LOANS
+    { name: "Soft Loans", path: "/soft-loans", icon: <FiFileText /> },
+    { name: "Soft Loan Dashboard", path: "/soft-loan-dashboard", icon: <MdDashboard /> },
+
+    // DONORS
+    { name: "Donors", path: "/donors", icon: <FiUser /> },
+    { name: "Donor Dashboard", path: "/donor-dashboard", icon: <MdDashboard /> },
+
+    // DOCUMENTS
+    { name: "All Documents", path: "/all-documents", icon: <FiFolder /> },
+    { name: "Upload Documents", path: "/upload-documents", icon: <FiUpload /> },
+    { name: "Trust Documents", path: "/trust-documents", icon: <FiFolder /> },
+    { name: "BOT Minutes", path: "/bot-minutes", icon: <FiFolder /> },
+    { name: "Bank Documents", path: "/bank-documents", icon: <FiFolder /> },
+    { name: "Other Documents", path: "/other-documents", icon: <FiFolder /> },
+
+    // USERS
+    { name: "Users", path: "/users", icon: <FiUsers /> },
+
+    // MISC
+    { name: "Import Data", path: "/import-data", icon: <FiSettings /> },
   ];
 
   return (
-    <div className="h-screen w-64 bg-sidebarBg text-white flex flex-col shadow-xl">
-      <div className="p-6 text-center border-b border-grayMid/20">
-        <h1 className="text-2xl font-bold tracking-wide">ZIST Admin</h1>
-        <p className="text-sm opacity-60">Management Portal</p>
-      </div>
+    <div className="w-64 h-screen bg-gray-900 text-white p-5 fixed left-0 top-0 overflow-y-auto">
+      <h1 className="text-2xl font-bold mb-6">ZIST Admin<br /><span className="text-sm">Management Portal</span></h1>
 
-      <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
-        {menuItems.map((item) => (
+      <nav className="space-y-2">
+        {menu.map((item) => (
           <NavLink
-            key={item.to}
-            to={item.to}
+            key={item.path}
+            to={item.path}
             className={({ isActive }) =>
-              `flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-smooth ${
-                isActive
-                  ? "bg-primaryLight text-white shadow-md"
-                  : "text-gray-200 hover:bg-sidebarHover hover:text-white"
+              `flex items-center gap-3 px-4 py-2 rounded-lg ${
+                isActive ? "bg-blue-600 text-white" : "hover:bg-gray-800"
               }`
             }
           >
-            <item.icon className="w-5 h-5" />
-            {item.label}
+            <span>{item.icon}</span>
+            {item.name}
           </NavLink>
         ))}
       </nav>
 
-      <div className="p-3 border-t border-grayMid/20">
-        <button
-          onClick={logout}
-          className="w-full flex items-center justify-center gap-2 bg-danger text-white py-3 rounded-lg hover:bg-red-700 transition-smooth"
-        >
-          <ArrowRightOnRectangleIcon className="w-5 h-5" />
-          Logout
-        </button>
-      </div>
+      <button
+        onClick={handleLogout}
+        className="w-full bg-red-600 text-white py-2 mt-6 rounded flex items-center justify-center gap-2"
+      >
+        Logout
+      </button>
     </div>
   );
 }

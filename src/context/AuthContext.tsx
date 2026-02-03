@@ -1,43 +1,53 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
+import { useNavigate } from "react-router-dom";
 
-const AuthContext = createContext(null);
+interface AuthContextType {
+  user: any;
+  role: string | null;
+  loading: boolean;
+  logout: () => Promise<void>;
+}
 
-export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
-  const [role, setRole] = useState(null);
+const AuthContext = createContext<AuthContextType | null>(null);
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const navigate = useNavigate();
+
+  const [user, setUser] = useState<any>(null);
+  const [role, setRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadSession();
+    checkSession();
 
     const { data: listener } = supabase.auth.onAuthStateChange(() => {
-      loadSession();
+      checkSession();
     });
 
-    return () => listener.subscription.unsubscribe();
+    return () => {
+      listener.subscription.unsubscribe();
+    };
   }, []);
 
-  const loadSession = async () => {
-    setLoading(true);
-
+  const checkSession = async () => {
     const { data } = await supabase.auth.getSession();
     const sessionUser = data?.session?.user;
 
     if (!sessionUser) {
       setUser(null);
       setRole(null);
-      return setLoading(false);
+      setLoading(false);
+      return;
     }
 
     setUser(sessionUser);
 
-    // correct table name
     const { data: roleRow } = await supabase
       .from("user_roles")
       .select("role")
       .eq("user_id", sessionUser.id)
-      .maybeSingle(); // prevents errors
+      .maybeSingle();
 
     setRole(roleRow?.role || null);
     setLoading(false);
@@ -45,8 +55,11 @@ export function AuthProvider({ children }) {
 
   const logout = async () => {
     await supabase.auth.signOut();
-    setUser(null);
-    setRole(null);
+
+    localStorage.clear();
+    sessionStorage.clear();
+
+    window.location.href = "/login";
   };
 
   return (
@@ -57,5 +70,5 @@ export function AuthProvider({ children }) {
 }
 
 export function useAuth() {
-  return useContext(AuthContext);
+  return useContext(AuthContext) as AuthContextType;
 }

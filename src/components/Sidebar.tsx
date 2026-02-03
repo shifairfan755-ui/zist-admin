@@ -11,8 +11,15 @@ import {
   ChartPieIcon,
   InboxStackIcon,
 } from "@heroicons/react/24/outline";
+import { useAuth } from "../context/AuthContext";
 
 export default function Sidebar() {
+  const { logout } = useAuth();
+
+<button onClick={logout} className="...">
+  Logout
+</button>
+
   const menuItems = [
     { label: "Dashboard", icon: HomeIcon, to: "/dashboard" },
     { label: "New Application", icon: ClipboardDocumentListIcon, to: "/new-application" },
@@ -53,9 +60,11 @@ export default function Sidebar() {
         ))}
       </nav>
 
-      {/* LOGOUT BUTTON */}
       <div className="p-3 border-t border-grayMid/20">
-        <button className="w-full flex items-center justify-center gap-2 bg-danger text-white py-3 rounded-lg hover:bg-red-700 transition-smooth">
+        <button
+          onClick={logout}
+          className="w-full flex items-center justify-center gap-2 bg-danger text-white py-3 rounded-lg hover:bg-red-700 transition-smooth"
+        >
           <ArrowRightOnRectangleIcon className="w-5 h-5" />
           Logout
         </button>

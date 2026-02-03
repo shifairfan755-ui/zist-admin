@@ -1,12 +1,13 @@
 import { Routes, Route, Navigate } from "react-router-dom";
-import Sidebar from "./components/Sidebar";
 import { Outlet } from "react-router-dom";
+
+import Sidebar from "./components/Sidebar";
 
 // AUTH
 import Login from "./pages/Login";
 import ProtectedRoute from "./components/ProtectedRoute";
 
-// MAIN PAGES
+// MAIN
 import Dashboard from "./pages/Dashboard";
 import NewApplication from "./pages/NewApplication";
 import Applications from "./pages/Applications";
@@ -37,12 +38,12 @@ import DonorPDF from "./pages/DonorPDF";
 import DonorDashboard from "./pages/DonorDashboard";
 
 // DOCUMENTS
+import AllDocuments from "./pages/AllDocuments";
+import UploadDocuments from "./pages/UploadDocuments";
 import TrustDocuments from "./pages/TrustDocuments";
 import BOTMinutes from "./pages/BOTMinutes";
 import BankDocuments from "./pages/BankDocuments";
 import OtherDocuments from "./pages/OtherDocuments";
-import UploadDocuments from "./pages/UploadDocuments";
-import AllDocuments from "./pages/AllDocuments";
 
 // USERS
 import Users from "./pages/Users";
@@ -85,7 +86,11 @@ export default function App() {
       {/* PROTECTED ROUTE */}
       <Route element={<ProtectedRoute roles={["admin", "staff", "viewer"]} />}>
         <Route element={<Layout />}>
+
+          {/* DEFAULT REDIRECT */}
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
+
+          {/* DASHBOARD */}
           <Route path="/dashboard" element={<Dashboard />} />
 
           {/* APPLICATIONS */}
@@ -112,7 +117,7 @@ export default function App() {
           <Route path="/edit-soft-loan/:id" element={<EditSoftLoan />} />
           <Route path="/add-installment/:id" element={<AddInstallment />} />
           <Route path="/edit-installment/:id" element={<EditInstallment />} />
-          <Route path="/soft-loans-dashboard" element={<SoftLoanDashboard />} />
+          <Route path="/soft-loan-dashboard" element={<SoftLoanDashboard />} />
 
           {/* DONORS */}
           <Route path="/donors" element={<Donors />} />
@@ -125,11 +130,11 @@ export default function App() {
           <Route path="/donor-dashboard" element={<DonorDashboard />} />
 
           {/* DOCUMENTS */}
-          <Route path="/documents" element={<AllDocuments />} />
+          <Route path="/all-documents" element={<AllDocuments />} />
           <Route path="/upload-documents" element={<UploadDocuments />} />
           <Route path="/trust-documents" element={<TrustDocuments />} />
-          <Route path="/bank-documents" element={<BankDocuments />} />
           <Route path="/bot-minutes" element={<BOTMinutes />} />
+          <Route path="/bank-documents" element={<BankDocuments />} />
           <Route path="/other-documents" element={<OtherDocuments />} />
 
           {/* USERS */}
@@ -140,6 +145,7 @@ export default function App() {
 
           {/* IMPORT */}
           <Route path="/import-data" element={<ImportData />} />
+
         </Route>
       </Route>
     </Routes>

@@ -1,5 +1,6 @@
 import { NavLink, useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
+
 import { 
   FiHome, FiFilePlus, FiUsers, FiUser, FiFile, FiFileText, 
   FiFolder, FiUpload, FiSettings
@@ -47,7 +48,11 @@ export default function Sidebar() {
 
   return (
     <div className="w-64 h-screen bg-gray-900 text-white p-5 fixed left-0 top-0 overflow-y-auto">
-      <h1 className="text-2xl font-bold mb-6">ZIST Admin<br /><span className="text-sm">Management Portal</span></h1>
+      <h1 className="text-2xl font-bold mb-6">
+        ZIST Admin
+        <br />
+        <span className="text-sm">Management Portal</span>
+      </h1>
 
       <nav className="space-y-2">
         {menu.map((item) => (

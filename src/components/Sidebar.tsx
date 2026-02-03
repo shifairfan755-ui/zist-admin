@@ -1,6 +1,5 @@
 import { NavLink, useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
-
 import { 
   FiHome, FiFilePlus, FiUsers, FiUser, FiFile, FiFileText, 
   FiFolder, FiUpload, FiSettings
@@ -25,14 +24,14 @@ export default function Sidebar() {
 
     // SOFT LOANS
     { name: "Soft Loans", path: "/soft-loans", icon: <FiFileText /> },
-    { name: "Soft Loan Dashboard", path: "/soft-loan-dashboard", icon: <MdDashboard /> },
+    { name: "Soft Loan Dashboard", path: "/soft-loans-dashboard", icon: <MdDashboard /> },
 
     // DONORS
     { name: "Donors", path: "/donors", icon: <FiUser /> },
     { name: "Donor Dashboard", path: "/donor-dashboard", icon: <MdDashboard /> },
 
     // DOCUMENTS
-    { name: "All Documents", path: "/all-documents", icon: <FiFolder /> },
+    { name: "All Documents", path: "/documents", icon: <FiFolder /> },
     { name: "Upload Documents", path: "/upload-documents", icon: <FiUpload /> },
     { name: "Trust Documents", path: "/trust-documents", icon: <FiFolder /> },
     { name: "BOT Minutes", path: "/bot-minutes", icon: <FiFolder /> },
@@ -49,8 +48,7 @@ export default function Sidebar() {
   return (
     <div className="w-64 h-screen bg-gray-900 text-white p-5 fixed left-0 top-0 overflow-y-auto">
       <h1 className="text-2xl font-bold mb-6">
-        ZIST Admin
-        <br />
+        ZIST Admin<br />
         <span className="text-sm">Management Portal</span>
       </h1>
 

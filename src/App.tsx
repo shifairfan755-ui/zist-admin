@@ -1,4 +1,3 @@
-// ROUTER UPDATED 2026
 import { Routes, Route, Navigate } from "react-router-dom";
 import { Outlet } from "react-router-dom";
 
@@ -81,14 +80,14 @@ function Layout() {
 export default function App() {
   return (
     <Routes>
-      {/* PUBLIC ROUTE */}
+      {/* PUBLIC */}
       <Route path="/login" element={<Login />} />
 
-      {/* PROTECTED ROUTE */}
+      {/* PROTECTED */}
       <Route element={<ProtectedRoute roles={["admin", "staff", "viewer"]} />}>
         <Route element={<Layout />}>
 
-          {/* DEFAULT REDIRECT */}
+          {/* DEFAULT */}
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
           {/* DASHBOARD */}

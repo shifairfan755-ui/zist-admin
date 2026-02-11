@@ -1,28 +1,12 @@
 import { supabase } from "./supabaseClient";
 
-export async function getUserRole() {
-  // Get current session
-  const {
-    data: { user },
-    error: sessionError,
-  } = await supabase.auth.getUser();
-
-  if (sessionError || !user) {
-    console.error("No logged-in user");
-    return null;
-  }
-
-  // Fetch user profile
+export async function getUserRole(email: string) {
   const { data, error } = await supabase
-    .from("profiles")
+    .from("zist_users")
     .select("role")
-    .eq("id", user.id)
-    .single();
+    .eq("email", email)
+    .maybeSingle();
 
-  if (error) {
-    console.error("Profile fetch error:", error.message);
-    return null;
-  }
-
-  return data?.role || null;
+  if (error || !data) return "viewer";
+  return data.role;
 }

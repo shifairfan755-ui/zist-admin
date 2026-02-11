@@ -1,76 +1,80 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
-import { Link } from "react-router-dom";
 
 export default function Users() {
-  const [users, setUsers] = useState([]);
+  const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     loadUsers();
   }, []);
 
-  const loadUsers = async () => {
+  async function loadUsers() {
     setLoading(true);
 
     const { data, error } = await supabase
-      .from("users")        // ✔ Correct table
-      .select("id, full_name, email, role") // ✔ No status
-      .order("full_name", { ascending: true });
+      .from("zist_users")
+      .select("id, email, role")
+      .order("email", { ascending: true });
+
+    if (!error) setUsers(data || []);
+    setLoading(false);
+  }
+
+  async function updateRole(id: string, newRole: string) {
+    const { error } = await supabase
+      .from("zist_users")
+      .update({ role: newRole })
+      .eq("id", id);
 
     if (error) {
-      console.error("USER LOAD ERROR:", error);
-    } else {
-      setUsers(data);
+      alert("Failed to update role");
+      return;
     }
 
-    setLoading(false);
-  };
-
-  if (loading) {
-    return <div className="p-6 text-gray-600 text-xl">Loading...</div>;
+    alert("Role updated successfully");
+    loadUsers();
   }
+
+  if (loading) return <div className="p-6">Loading users...</div>;
 
   return (
     <div className="p-6">
-      <div className="flex justify-between mb-6">
-        <h1 className="text-3xl font-bold">Users</h1>
-        <Link
-          to="/add-user"
-          className="px-5 py-2 bg-purple-600 text-white rounded-lg"
-        >
-          + Add User
-        </Link>
-      </div>
+      <h1 className="text-2xl font-bold mb-6">User Management</h1>
 
-      <table className="w-full bg-white shadow-md rounded-lg">
-        <thead>
-          <tr className="border-b bg-gray-100">
-            <th className="p-3 text-left">Full Name</th>
-            <th className="p-3 text-left">Email</th>
-            <th className="p-3 text-left">Role</th>
-            <th className="p-3 text-left">Actions</th>
+      <table className="w-full border rounded-lg overflow-hidden">
+        <thead className="bg-gray-100">
+          <tr>
+            <th className="p-3 border">Email</th>
+            <th className="p-3 border">Role</th>
+            <th className="p-3 border">Action</th>
           </tr>
         </thead>
 
         <tbody>
-          {users.map((u: any) => (
-            <tr key={u.id} className="border-b hover:bg-gray-50">
-              <td className="p-3">{u.full_name}</td>
-              <td className="p-3">{u.email}</td>
-              <td className="p-3">
-                <span className="px-3 py-1 text-xs bg-purple-100 text-purple-700 rounded-full">
+          {users.map((u) => (
+            <tr key={u.id}>
+              <td className="p-3 border">{u.email}</td>
+
+              <td className="p-3 border">
+                <span
+                  className={`px-3 py-1 rounded text-white ${
+                    u.role === "Admin" ? "bg-green-600" : "bg-blue-600"
+                  }`}
+                >
                   {u.role}
                 </span>
               </td>
 
-              <td className="p-3 flex gap-4">
-                <Link to={`/edit-user/${u.id}`} className="text-blue-600">
-                  Edit
-                </Link>
-                <Link to={`/view-user/${u.id}`} className="text-green-600">
-                  View
-                </Link>
+              <td className="p-3 border">
+                <select
+                  className="border rounded p-2"
+                  value={u.role}
+                  onChange={(e) => updateRole(u.id, e.target.value)}
+                >
+                  <option value="Admin">Admin</option>
+                  <option value="User">User</option>
+                </select>
               </td>
             </tr>
           ))}

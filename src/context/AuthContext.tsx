@@ -1,74 +1,79 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
-import { useNavigate } from "react-router-dom";
 
-interface AuthContextType {
-  user: any;
-  role: string | null;
-  loading: boolean;
-  logout: () => Promise<void>;
-}
+const AuthContext = createContext<any>(null);
 
-const AuthContext = createContext<AuthContextType | null>(null);
-
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const navigate = useNavigate();
-
-  const [user, setUser] = useState<any>(null);
-  const [role, setRole] = useState<string | null>(null);
+export const AuthProvider = ({ children }) => {
+  const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    checkSession();
+  const loadZistUser = async (email: string) => {
+    const { data } = await supabase
+      .from("zist_users")
+      .select("*")
+      .eq("email", email)
+      .maybeSingle();
 
-    const { data: listener } = supabase.auth.onAuthStateChange(() => {
-      checkSession();
-    });
+    return data;
+  };
 
-    return () => {
-      listener.subscription.unsubscribe();
-    };
-  }, []);
-
-  const checkSession = async () => {
+  const initSession = async () => {
     const { data } = await supabase.auth.getSession();
     const sessionUser = data?.session?.user;
 
     if (!sessionUser) {
       setUser(null);
-      setRole(null);
       setLoading(false);
       return;
     }
 
-    setUser(sessionUser);
+    const profile = await loadZistUser(sessionUser.email);
 
-    const { data: roleRow } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", sessionUser.id)
-      .maybeSingle();
+    setUser(
+      profile ?? {
+        email: sessionUser.email,
+        role: "viewer",
+        full_name: "",
+      }
+    );
 
-    setRole(roleRow?.role || null);
     setLoading(false);
   };
 
-  const logout = async () => {
-    await supabase.auth.signOut();
+  useEffect(() => {
+    initSession();
 
-    localStorage.clear();
-    sessionStorage.clear();
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      async (_, session) => {
+        const sessionUser = session?.user;
 
-    window.location.href = "/login";
-  };
+        if (!sessionUser) {
+          setUser(null);
+          return setLoading(false);
+        }
+
+        const z = await loadZistUser(sessionUser.email);
+
+        setUser(
+          z ?? {
+            email: sessionUser.email,
+            role: "viewer",
+            full_name: "",
+          }
+        );
+
+        setLoading(false);
+      }
+    );
+
+    return () => listener.subscription.unsubscribe();
+  }, []);
 
   return (
-    <AuthContext.Provider value={{ user, role, loading, logout }}>
+    <AuthContext.Provider value={{ user, loading }}>
       {children}
     </AuthContext.Provider>
   );
-}
+};
 
-export function useAuth() {
-  return useContext(AuthContext) as AuthContextType;
-}
+export const useAuth = () => useContext(AuthContext);

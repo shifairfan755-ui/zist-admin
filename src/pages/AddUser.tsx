@@ -5,148 +5,168 @@ import { supabase } from "../lib/supabaseClient";
 export default function AddUser() {
   const navigate = useNavigate();
 
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [role, setRole] = useState("staff");
+  const [form, setForm] = useState({
+    full_name: "",
+    email: "",
+    password: "",
+    role: "Staff",
+  });
+
   const [loading, setLoading] = useState(false);
+
+  const handleChange = (e: any) => {
+    setForm({ ...form, [e.target.name]: e.target.value });
+  };
 
   const handleSubmit = async (e: any) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      // ---------------------------------------------------------
-      // ⭐ STEP 1 — CREATE AUTH USER (using service role key)
-      // ---------------------------------------------------------
-
-      const url = `${import.meta.env.VITE_SUPABASE_URL}/auth/v1/admin/users`;
-
-      const response = await fetch(url, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${
-            import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY
-          }`,
-          apikey: import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email,
-          password,
+      // 1) CREATE AUTH USER (or get existing user)
+      const { data: authUser, error: authError } =
+        await supabaseAdmin.auth.admin.createUser({
+          email: form.email,
+          password: form.password,
           email_confirm: true,
-        }),
-      });
-
-      const data = await response.json();
-      console.log("ADMIN CREATE RESPONSE:", data);
-
-      if (!response.ok) {
-        alert("Error creating auth user: " + JSON.stringify(data));
-        setLoading(false);
-        return;
-      }
-
-      const userId = data.user?.id;
-
-      if (!userId) {
-        alert("❌ Failed — No user ID returned from Supabase.");
-        setLoading(false);
-        return;
-      }
-
-      // ---------------------------------------------------------
-      // ⭐ STEP 2 — INSERT NAME INTO LOCAL users TABLE
-      // ---------------------------------------------------------
-      const { error: usersTableError } = await supabase
-        .from("users")
-        .insert({
-          id: userId,
-          name: name.trim(),
-          email: email.trim(),
         });
 
-      if (usersTableError) {
-        alert("Error inserting into users table: " + usersTableError.message);
+      // If user already exists in Auth
+      if (authError && authError.message.includes("already been registered")) {
+        const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
+        const existing = existingUsers.users.find(
+          (u: any) => u.email === form.email
+        );
+
+        if (!existing) {
+          alert("Unexpected: user exists but cannot fetch user_id");
+          setLoading(false);
+          return;
+        }
+
+        alert("User already exists, updating records...");
+        handleExistingUser(existing.id);
+        return;
+      }
+
+      if (authError) {
+        alert("Auth Error: " + authError.message);
         setLoading(false);
         return;
       }
 
-      // ---------------------------------------------------------
-      // ⭐ STEP 3 — ASSIGN ROLE IN user_role TABLE
-      // ---------------------------------------------------------
-      const { error: roleError } = await supabase.from("user_role").insert({
-        user_id: userId,
-        role: role.toLowerCase(),
-      });
+      const user_id = authUser.user?.id;
 
-      if (roleError) {
-        alert("Error saving role: " + roleError.message);
+      if (!user_id) {
+        alert("Auth user created but no user_id returned!");
         setLoading(false);
         return;
       }
 
-      alert("✅ User created successfully!");
-      navigate("/users");
+      await saveUserInDB(user_id);
+
     } catch (err: any) {
-      console.error("Unexpected Error:", err);
       alert("Unexpected error: " + err.message);
     }
 
     setLoading(false);
   };
 
+  // Save or Update DB Tables
+  const saveUserInDB = async (user_id: string) => {
+    // CHECK IF PROFILE EXISTS
+    const { data: existingProfile } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("id", user_id)
+      .maybeSingle();
+
+    // INSERT or UPDATE profiles
+    if (existingProfile) {
+      await supabase.from("profiles").update({
+        full_name: form.full_name,
+        email: form.email,
+      }).eq("id", user_id);
+    } else {
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .insert([{ id: user_id, full_name: form.full_name, email: form.email }]);
+
+      if (profileError) {
+        alert("Profile insert failed: " + profileError.message);
+        return;
+      }
+    }
+
+    // public.users
+    await supabase.from("users").upsert([
+      {
+        id: user_id,
+        full_name: form.full_name,
+        email: form.email,
+        role: form.role.toLowerCase(),
+      },
+    ]);
+
+    // user_roles
+    await supabase.from("user_roles").upsert([
+      {
+        user_id,
+        role: form.role.toLowerCase(),
+        status: "active",
+        is_disabled: false,
+      },
+    ]);
+
+    alert("User saved successfully!");
+    navigate("/users");
+  };
+
   return (
-    <div className="max-w-2xl mx-auto bg-white shadow p-6 rounded">
-      <h2 className="text-2xl font-bold mb-4">Add User</h2>
+    <div className="p-6 max-w-lg mx-auto">
+      <h1 className="text-3xl font-bold mb-6 text-blue-700">Add User</h1>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Name */}
+      <form onSubmit={handleSubmit} className="space-y-4 bg-white p-6 rounded-xl shadow">
         <input
-          type="text"
-          className="w-full p-3 border rounded"
-          placeholder="User Name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
+          name="full_name"
+          placeholder="Full Name"
+          value={form.full_name}
+          onChange={handleChange}
+          className="border p-3 rounded w-full"
           required
         />
-
-        {/* Email */}
         <input
-          type="email"
-          className="w-full p-3 border rounded"
+          name="email"
           placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          value={form.email}
+          onChange={handleChange}
+          className="border p-3 rounded w-full"
           required
         />
-
-        {/* Password */}
         <input
+          name="password"
           type="password"
-          className="w-full p-3 border rounded"
           placeholder="Password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
+          value={form.password}
+          onChange={handleChange}
+          className="border p-3 rounded w-full"
           required
         />
-
-        {/* Role */}
         <select
-          className="w-full p-3 border rounded"
-          value={role}
-          onChange={(e) => setRole(e.target.value)}
+          name="role"
+          value={form.role}
+          onChange={handleChange}
+          className="border p-3 rounded w-full"
         >
-          <option value="admin">Admin</option>
-          <option value="staff">Staff</option>
-          <option value="viewer">Viewer</option>
+          <option value="Admin">Admin</option>
+          <option value="Staff">Staff</option>
+          <option value="Viewer">Viewer</option>
         </select>
 
-        {/* Submit */}
         <button
           type="submit"
           disabled={loading}
-          className="w-full bg-green-600 text-white py-3 rounded hover:bg-green-700"
+          className="bg-blue-700 text-white p-3 rounded w-full text-lg font-semibold"
         >
           {loading ? "Creating..." : "Create User"}
         </button>

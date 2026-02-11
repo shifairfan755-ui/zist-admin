@@ -5,10 +5,10 @@ import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 
 const zistLogo =
-  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAXAAAABSCAYAAABYNrkGAAAACXBIWXMAAAsTAAALEwEAmpwYAAAI2ElEQ..."; // keep existing logo
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAXAAAABSCAYAAABYNrkGAAAACXBIWXMAAAsTAAALEwEAmpwYAAAI2ElEQ...";
 
 export default function ViewApplication() {
-  const { id } = useParams(); // UUID – keep as string
+  const { id } = useParams();
   const navigate = useNavigate();
 
   const [app, setApp] = useState<any>(null);
@@ -18,8 +18,8 @@ export default function ViewApplication() {
 
   const pdfRef = useRef<HTMLDivElement>(null);
 
-  const convertToBase64 = (url: string) => {
-    return new Promise((resolve) => {
+  const convertToBase64 = (url: string) =>
+    new Promise((resolve) => {
       const img = new Image();
       img.crossOrigin = "anonymous";
       img.src = url;
@@ -28,14 +28,12 @@ export default function ViewApplication() {
         const c = document.createElement("canvas");
         c.width = img.width;
         c.height = img.height;
-        const ctx = c.getContext("2d");
-        ctx?.drawImage(img, 0, 0);
+        c.getContext("2d")?.drawImage(img, 0, 0);
         resolve(c.toDataURL("image/png"));
       };
 
       img.onerror = () => resolve(null);
     });
-  };
 
   // Load application + photos
   const loadData = async () => {
@@ -75,38 +73,29 @@ export default function ViewApplication() {
 
   // Delete Application
   const deleteApplication = async () => {
-    const yes = window.confirm("Are you sure you want to delete this application?");
-    if (!yes) return;
+    if (!window.confirm("Are you sure you want to delete this application?")) return;
 
     try {
-      // 1️⃣ Load related photos
+      // Load related photos
       const { data: appPhotos } = await supabase
         .from("application_photos")
         .select("*")
         .eq("application_id", id);
 
-      // 2️⃣ Delete from storage
-      if (appPhotos && appPhotos.length > 0) {
-        const filePaths = appPhotos
-          .map((x) => x.file_path)
-          .filter((p) => p && p.length > 3);
+      // Remove from storage (correct bucket)
+      if (appPhotos?.length) {
+        const filePaths = appPhotos.map((x) => x.file_path).filter(Boolean);
 
-        if (filePaths.length > 0) {
-          await supabase.storage.from("application-photos").remove(filePaths);
+        if (filePaths.length) {
+          await supabase.storage.from("application_photos").remove(filePaths);
         }
       }
 
-      // 3️⃣ Delete rows from application_photos
-      await supabase
-        .from("application_photos")
-        .delete()
-        .eq("application_id", id);
+      // Delete rows from application_photos
+      await supabase.from("application_photos").delete().eq("application_id", id);
 
-      // 4️⃣ Delete application
-      const { error } = await supabase
-        .from("applications")
-        .delete()
-        .eq("id", id);
+      // Delete application
+      const { error } = await supabase.from("applications").delete().eq("id", id);
 
       if (error) {
         alert("Failed to delete: " + error.message);
@@ -115,7 +104,6 @@ export default function ViewApplication() {
 
       alert("Application deleted successfully");
       navigate("/applications");
-
     } catch (err: any) {
       alert("Delete failed: " + err.message);
     }
@@ -156,12 +144,10 @@ export default function ViewApplication() {
       {/* PDF AREA */}
       <div ref={pdfRef} className="bg-white p-6 border rounded-xl">
 
-        {/* Header */}
         <div className="text-center mb-4">
           <img src={zistLogo} style={{ width: "220px" }} />
         </div>
 
-        {/* Applicant */}
         <div className="flex justify-between border-b pb-4 mb-4">
           <div>
             <p className="text-xl font-bold">{app.applicant_name}</p>
@@ -177,8 +163,7 @@ export default function ViewApplication() {
           )}
         </div>
 
-        {/* Details */}
-        <table className="w-full">
+        <table className="w-full text-[15px]">
           <tbody>
             <DetailRow label="Applicant Name" value={app.applicant_name} />
             <DetailRow label="Parentage" value={app.parentage} />
@@ -213,6 +198,7 @@ export default function ViewApplication() {
           Delete Application
         </button>
       </div>
+
     </div>
   );
 }

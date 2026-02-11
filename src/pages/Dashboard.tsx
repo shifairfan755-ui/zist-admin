@@ -1,157 +1,166 @@
+supabase.from("zist_users").select("*").limit(1)
+  .then(res => console.log("TEST SELECT:", res));
+
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
-import { Doughnut } from "react-chartjs-2";
-import "chart.js/auto";
+import useUserRole from "../lib/useUserRole";
+import CategoryChart from "../components/CategoryChart";
 
 export default function Dashboard() {
-  const [payments, setPayments] = useState([]);
-  const [todayTotal, setTodayTotal] = useState(0);
-  const [monthTotal, setMonthTotal] = useState(0);
-  const [yearTotal, setYearTotal] = useState(0);
-  const [categoryTotals, setCategoryTotals] = useState({});
-  const [recent, setRecent] = useState([]);
+  const { role, loading: roleLoading } = useUserRole();
+
+  const [stats, setStats] = useState({
+    today: 0,
+    month: 0,
+    year: 0,
+    categories: 0,
+  });
+
+  const [latestStory, setLatestStory] = useState<any>(null);
+  const [categoryData, setCategoryData] = useState([]);
+console.log("ENV TEST:", import.meta.env);
+console.log("SUPABASE URL:", import.meta.env.VITE_SUPABASE_URL);
+console.log("SUPABASE KEY:", import.meta.env.VITE_SUPABASE_ANON_KEY);
 
   useEffect(() => {
-    loadPayments();
+    loadDashboard();
   }, []);
 
-  const loadPayments = async () => {
-    const { data, error } = await supabase
+  async function loadDashboard() {
+    const todayStr = new Date().toISOString().split("T")[0];
+
+    /* TODAY */
+    const { data: todayData } = await supabase
       .from("payments")
-      .select("*")
-      .order("payment_date", { ascending: false });
+      .select("amount, created_at")
+      .gte("created_at", todayStr + "T00:00:00.000Z")
+      .lte("created_at", todayStr + "T23:59:59.999Z");
 
-    if (!error && data) {
-      setPayments(data);
-      computeDashboard(data);
-    }
-  };
+    const todayTotal =
+      todayData?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0;
 
-  const computeDashboard = (data) => {
-    if (!data.length) return;
+    /* MONTH */
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
-    const today = new Date().toISOString().slice(0, 10);
-    const month = today.slice(0, 7);
-    const year = today.slice(0, 4);
+    const { data: monthData } = await supabase
+      .from("payments")
+      .select("amount, created_at")
+      .gte("created_at", monthStart);
 
-    setTodayTotal(
-      data.filter((p) => p.payment_date === today).reduce((s, p) => s + p.amount, 0)
-    );
+    const monthTotal =
+      monthData?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0;
 
-    setMonthTotal(
-      data.filter((p) => p.payment_date.startsWith(month)).reduce((s, p) => s + p.amount, 0)
-    );
+    /* YEAR */
+    const yearStart = new Date(now.getFullYear(), 0, 1).toISOString();
 
-    setYearTotal(
-      data.filter((p) => p.payment_date.startsWith(year)).reduce((s, p) => s + p.amount, 0)
-    );
+    const { data: yearData } = await supabase
+      .from("payments")
+      .select("amount, created_at")
+      .gte("created_at", yearStart);
 
-    const grouped = {};
-    data.forEach((p) => {
-      grouped[p.category] = (grouped[p.category] || 0) + p.amount;
+    const yearTotal =
+      yearData?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0;
+
+    /* CATEGORIES */
+    const { data: categoryRows } = await supabase
+      .from("payments")
+      .select("category");
+
+    const uniqueCategories = new Set(categoryRows?.map((x) => x.category));
+    const categoryCount = uniqueCategories.size;
+
+    setStats({
+      today: todayTotal,
+      month: monthTotal,
+      year: yearTotal,
+      categories: categoryCount,
     });
 
-    setCategoryTotals(grouped);
-    setRecent(data.slice(0, 10));
-  };
+    /* LATEST STORY */
+    const { data: story } = await supabase
+      .from("success_stories")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(1);
+
+    setLatestStory(story?.[0] || null);
+
+    /* CATEGORY CHART */
+    const counts: any = {};
+    categoryRows?.forEach((row) => {
+      counts[row.category] = (counts[row.category] || 0) + 1;
+    });
+
+    const formatted = Object.keys(counts).map((key) => ({
+      name: key,
+      value: counts[key],
+    }));
+
+    setCategoryData(formatted);
+  }
 
   return (
-    <div className="p-6 space-y-10">
+    <div className="w-full px-6 py-6">
 
-      {/* PAGE TITLE */}
-      <h1 className="text-3xl font-bold text-primary">Dashboard</h1>
-
-      {/* TOP KPI CARDS */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <StatCard title="Today's Spending" amount={todayTotal} gradient="gradient-blue" />
-        <StatCard title="This Month" amount={monthTotal} gradient="gradient-green" />
-        <StatCard title="This Year" amount={yearTotal} gradient="gradient-purple" />
-        <StatCard title="Total Categories" amount={Object.keys(categoryTotals).length} gradient="gradient-orange" />
+      {/* ROLE */}
+      <div className="flex justify-end text-gray-600 text-sm mb-4">
+        {roleLoading ? "Loading role…" : `Role: ${role}`}
       </div>
 
-      {/* CATEGORY DONUT CHART */}
-      <div className="bg-white p-6 rounded-card shadow-card">
-        <h2 className="text-xl font-semibold mb-6 text-textDark">Category Distribution</h2>
+      <h2 className="text-3xl font-bold text-gray-900 mb-6">Dashboard</h2>
+
+      {/* STATS */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+
+        <div className="p-6 rounded-2xl text-white shadow bg-gradient-to-r from-blue-500 to-blue-700">
+          <p className="text-sm opacity-90">Today's Spending</p>
+          <p className="text-3xl font-bold">₹{stats.today}</p>
+        </div>
+
+        <div className="p-6 rounded-2xl text-white shadow bg-gradient-to-r from-green-500 to-green-700">
+          <p className="text-sm opacity-90">This Month</p>
+          <p className="text-3xl font-bold">₹{stats.month}</p>
+        </div>
+
+        <div className="p-6 rounded-2xl text-white shadow bg-gradient-to-r from-purple-500 to-purple-700">
+          <p className="text-sm opacity-90">This Year</p>
+          <p className="text-3xl font-bold">₹{stats.year}</p>
+        </div>
+
+        <div className="p-6 rounded-2xl text-white shadow bg-gradient-to-r from-orange-500 to-orange-700">
+          <p className="text-sm opacity-90">Total Categories</p>
+          <p className="text-3xl font-bold">₹{stats.categories}</p>
+        </div>
+      </div>
+
+      {/* CATEGORY DISTRIBUTION */}
+      <div className="bg-white shadow rounded-2xl p-6 mb-10">
+        <h3 className="text-lg font-semibold mb-4">Category Distribution</h3>
 
         <div className="flex justify-center">
-          <div className="w-[300px] md:w-[380px] lg:w-[420px]">
-            <Doughnut
-              data={{
-                labels: Object.keys(categoryTotals),
-                datasets: [
-                  {
-                    data: Object.values(categoryTotals),
-                    backgroundColor: [
-                      "#0D47A1",
-                      "#10B981",
-                      "#F59E0B",
-                      "#EF4444",
-                      "#3B82F6",
-                      "#8B5CF6",
-                      "#F87171",
-                      "#34D399",
-                      "#60A5FA",
-                    ],
-                    borderWidth: 1,
-                    cutout: "60%",
-                  },
-                ],
-              }}
-              options={{
-                maintainAspectRatio: false,
-                plugins: {
-                  legend: { position: "bottom", labels: { boxWidth: 14 } },
-                },
-              }}
-              height={300}
-            />
+          <div className="w-[300px] sm:w-[400px] md:w-[500px] lg:w-[600px] min-h-[320px]">
+            <CategoryChart data={categoryData} />
           </div>
         </div>
       </div>
 
-      {/* RECENT PAYMENTS */}
-      <div className="bg-white p-6 rounded-card shadow-card">
-        <h2 className="text-xl font-semibold mb-4 text-textDark">Recent Payments</h2>
+      {/* LATEST STORY */}
+      <div className="bg-white shadow rounded-2xl p-6 mb-20">
+        <h3 className="text-lg font-semibold mb-3">Latest Success Story</h3>
 
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b text-grayDark">
-              <th className="p-2 text-left">Payee</th>
-              <th className="p-2 text-left">Category</th>
-              <th className="p-2 text-right">Amount</th>
-              <th className="p-2 text-right">Date</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            {recent.map((p, index) => (
-              <tr key={index} className="border-b hover:bg-gray-50 transition-smooth">
-                <td className="p-2">{p.payee_name}</td>
-                <td className="p-2">
-                  <span className="px-3 py-1 text-xs bg-primaryLight/20 text-primaryDark rounded-full">
-                    {p.category}
-                  </span>
-                </td>
-                <td className="p-2 text-right font-bold text-success">
-                  ₹{p.amount.toLocaleString()}
-                </td>
-                <td className="p-2 text-right">{p.payment_date}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        {latestStory ? (
+          <div className="p-4 bg-gray-100 rounded-md">
+            <p className="font-medium">{latestStory.title}</p>
+            <p className="text-sm text-gray-600">
+              {new Date(latestStory.created_at).toLocaleDateString()}
+            </p>
+          </div>
+        ) : (
+          <p className="text-gray-500">No stories available.</p>
+        )}
       </div>
 
-    </div>
-  );
-}
-
-/* PREMIUM KPI CARD */
-function StatCard({ title, amount, gradient }) {
-  return (
-    <div className={`stat-card rounded-card p-6 text-white shadow-md ${gradient}`}>
-      <h3 className="text-sm opacity-90">{title}</h3>
-      <p className="text-3xl font-bold mt-1">₹{amount.toLocaleString()}</p>
     </div>
   );
 }

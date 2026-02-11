@@ -11,48 +11,41 @@ export default function UploadDocuments() {
   const [results, setResults] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // Category → Storage + Table
+  // Categories mapped to storage buckets only
   const categoryConfig: any = {
     "Beneficiary Documents": {
       storage: "beneficiary-docs",
-      table: "beneficiary_documents",
       autoBeneficiary: true,
     },
     "BOT Minutes": {
       storage: "bot_minutes",
-      table: "bot_minutes",
     },
     "Trust Documents": {
       storage: "trust_docs",
-      table: "global_documents",
     },
     "Bank Documents": {
       storage: "bank_docs",
-      table: "global_documents",
     },
     "Donor Documents": {
       storage: "donor_files",
-      table: "donor_files",
       donor: true,
     },
     "Soft Loan Documents": {
       storage: "softloan_docs",
-      table: "soft_loan_installments",
     },
     "Other Documents": {
       storage: "other_docs",
-      table: "other_documents",
     },
   };
 
-  // Drag and Drop
+  // Drag and Drop handler
   const onDrop = useCallback((acceptedFiles: File[]) => {
     setFiles((prev) => [...prev, ...acceptedFiles]);
   }, []);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({ onDrop });
 
-  // Detect Beneficiary ID from filename
+  // Extract beneficiary ID or Date from filename
   const detectInfo = (fileName: string) => {
     const id = fileName.match(/\d+/);
     const date = fileName.match(/\d{4}-\d{2}-\d{2}/);
@@ -63,13 +56,14 @@ export default function UploadDocuments() {
     };
   };
 
-  // Start Upload
   const startUpload = async () => {
-    if (!category || files.length === 0) return alert("Please select category & upload files");
-    if (!documentName) return alert("Enter document name");
-    if (!documentDate) return alert("Enter document date");
+    if (!category || files.length === 0)
+      return alert("Select a category and upload at least 1 file.");
+    if (!documentName) return alert("Enter document name.");
+    if (!documentDate) return alert("Enter document date.");
 
-    const { storage, table, autoBeneficiary } = categoryConfig[category];
+    const { storage, autoBeneficiary, donor } = categoryConfig[category];
+
     setLoading(true);
     setResults([]);
 
@@ -79,23 +73,28 @@ export default function UploadDocuments() {
       try {
         const filePath = `${Date.now()}-${file.name}`;
 
-        // 1) Upload to Storage
+        // Step 1 — Upload to Supabase Storage
         const { error: uploadError } = await supabase.storage
           .from(storage)
           .upload(filePath, file);
 
         if (uploadError) throw new Error(uploadError.message);
 
-        // 2) Prepare DB insert payload
+        // Step 2 — Build stored file URL
+        const file_url = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/${storage}/${filePath}`;
+
+        // Step 3 — Create DB row payload
         const payload: any = {
           file_path: filePath,
+          file_url,
+          file_name: file.name,
+          category: storage, // trust_docs / bank_docs etc.
           uploaded_at: new Date().toISOString(),
-          document_name: documentName,
-          document_date: documentDate,
-          description: description || null,
+          doc_date: documentDate,
+          notes: description || null,
         };
 
-        // Auto beneficiary ID only for Beneficiary Docs
+        // Auto beneficiary linking
         if (autoBeneficiary) {
           const info = detectInfo(file.name);
 
@@ -106,20 +105,22 @@ export default function UploadDocuments() {
             .maybeSingle();
 
           payload.beneficiary_id = ben?.id || null;
-          payload.date = info.detectedDate || null;
         }
 
-        // 3) Insert into table
+        // Donor linking if needed
+        if (donor) {
+          // if donor module requires donor linking, add here
+          payload.donor_id = null;
+        }
+
+        // Step 4 — Insert into global_documents
         const { error: insertError } = await supabase
-          .from(table)
+          .from("global_documents")
           .insert([payload]);
 
         if (insertError) throw new Error(insertError.message);
 
-        uploadResults.push({
-          file: file.name,
-          status: "success",
-        });
+        uploadResults.push({ file: file.name, status: "success" });
       } catch (err: any) {
         uploadResults.push({
           file: file.name,
@@ -132,7 +133,7 @@ export default function UploadDocuments() {
     setLoading(false);
     setResults(uploadResults);
 
-    // Clear form
+    // Reset form
     setFiles([]);
     setDocumentName("");
     setDocumentDate("");
@@ -146,7 +147,6 @@ export default function UploadDocuments() {
       </h1>
 
       <div className="bg-white shadow-lg p-6 border rounded-xl space-y-6">
-
         {/* Category */}
         <div>
           <label className="font-semibold">Category</label>
@@ -170,7 +170,7 @@ export default function UploadDocuments() {
             className="w-full border p-3 rounded-lg"
             value={documentName}
             onChange={(e) => setDocumentName(e.target.value)}
-            placeholder="e.g. Trust Meeting Minutes - Jan 2024"
+            placeholder="e.g. Trust Meeting Jan 2024"
           />
         </div>
 
@@ -193,11 +193,11 @@ export default function UploadDocuments() {
             rows={3}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="Enter short notes about this document..."
+            placeholder="Short notes..."
           />
         </div>
 
-        {/* Drag & Drop */}
+        {/* File Dropzone */}
         <div
           {...getRootProps()}
           className={`border-2 border-dashed p-10 rounded-xl text-center cursor-pointer ${
@@ -210,7 +210,7 @@ export default function UploadDocuments() {
           </p>
         </div>
 
-        {/* File List */}
+        {/* Selected Files */}
         {files.length > 0 && (
           <div className="mt-4 bg-gray-50 p-4 rounded-lg border">
             <h3 className="font-semibold mb-2">Files Selected:</h3>
@@ -230,7 +230,6 @@ export default function UploadDocuments() {
         >
           {loading ? "Uploading..." : "Upload Documents"}
         </button>
-
       </div>
 
       {/* Upload Results */}

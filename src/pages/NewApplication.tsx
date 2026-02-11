@@ -30,53 +30,71 @@ export default function NewApplication() {
 
     let document_url = null;
 
-    // Upload document if exists
-    if (documentFile) {
-      const filePath = `applications/${Date.now()}-${documentFile.name}`;
+    try {
+      // -------------------------------------------
+      // 1) UPLOAD DOCUMENT FILE (IF PROVIDED)
+      // -------------------------------------------
+      if (documentFile) {
+        const fileExt = documentFile.name.split(".").pop();
+        const fileName = `${Date.now()}.${fileExt}`;
+        const filePath = `apps/${fileName}`; // folder inside bucket
 
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from("documents")
-        .upload(filePath, documentFile);
+        const { error: uploadError } = await supabase.storage
+          .from("application_files")       // ✅ correct bucket name
+          .upload(filePath, documentFile, {
+            cacheControl: "3600",
+            upsert: false,
+          });
 
-      if (uploadError) {
-        alert("Document Upload Failed");
+        if (uploadError) {
+          console.log(uploadError);
+          alert("Document Upload Failed");
+          setLoading(false);
+          return;
+        }
+
+        const { data: publicUrlData } = supabase.storage
+          .from("application_files")
+          .getPublicUrl(filePath);
+
+        document_url = publicUrlData.publicUrl;
+      }
+
+      // -------------------------------------------
+      // 2) INSERT APPLICATION INTO DATABASE
+      // -------------------------------------------
+      const { error } = await supabase.from("applications").insert([
+        {
+          applicant_name: form.applicant_name,
+          parentage: form.parentage,
+          phone: form.phone,
+          address: form.address,
+          requested_for: form.requested_for,
+          amount_requested: form.amount_requested,
+          recommendation: form.recommendation,
+          notes: form.notes,
+          application_date: form.application_date || new Date(),
+          document_url: document_url,
+          status: "Pending",
+        },
+      ]);
+
+      if (error) {
+        console.log(error);
+        alert("Error saving application");
         setLoading(false);
         return;
       }
 
-      const { data: publicURL } = supabase.storage
-        .from("documents")
-        .getPublicUrl(filePath);
+      alert("Application saved successfully!");
+      navigate("/applications");
 
-      document_url = publicURL.publicUrl;
-    }
-
-    // Insert into Supabase
-    const { error } = await supabase.from("applications").insert([
-      {
-        applicant_name: form.applicant_name,
-        parentage: form.parentage,
-        phone: form.phone,
-        address: form.address,
-        requested_for: form.requested_for,
-        amount_requested: form.amount_requested,
-        recommendation: form.recommendation,
-        notes: form.notes,
-        application_date: form.application_date || new Date(),
-        document_url,
-        status: "Pending",
-      },
-    ]);
-
-    if (error) {
-      alert("Error saving application");
-      console.log(error);
-      setLoading(false);
-      return;
+    } catch (err) {
+      console.error(err);
+      alert("Unexpected error");
     }
 
     setLoading(false);
-    navigate("/applications"); // redirect after save
   };
 
   return (
@@ -193,8 +211,7 @@ export default function NewApplication() {
         <button
           type="submit"
           disabled={loading}
-          className="bg-blue-600 text-white w-full p-3 rounded-lg
-            hover:bg-blue-700 transition"
+          className="bg-blue-600 text-white w-full p-3 rounded-lg hover:bg-blue-700 transition"
         >
           {loading ? "Saving..." : "Submit Application"}
         </button>

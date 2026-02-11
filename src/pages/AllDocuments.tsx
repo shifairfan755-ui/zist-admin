@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
-
 import {
   EyeIcon,
   ArrowDownTrayIcon,
@@ -28,27 +27,28 @@ export default function AllDocuments() {
     if (!error) setDocs(data);
   };
 
-  const deleteDocument = async (id, file_path, category) => {
+  const deleteDocument = async (id, file_path, bucket) => {
     if (!confirm("Delete this document?")) return;
 
-    await supabase
-      .from("global_documents")
-      .delete()
-      .eq("id", id);
+    // 1) Delete DB row
+    await supabase.from("global_documents").delete().eq("id", id);
 
-    // Delete from correct bucket
-    await supabase.storage.from(category).remove([file_path]);
+    // 2) Delete file from Storage bucket
+    await supabase.storage.from(bucket).remove([file_path]);
 
     loadDocuments();
   };
 
+  // Filters + Sorting Logic
   const filteredDocs = docs
-    .filter(
-      (d) =>
-        d.file_name?.toLowerCase().includes(search.toLowerCase()) ||
-        d.document_name?.toLowerCase().includes(search.toLowerCase()) ||
-        d.category?.toLowerCase().includes(search.toLowerCase())
-    )
+    .filter((d) => {
+      const s = search.toLowerCase();
+      return (
+        d.file_name?.toLowerCase().includes(s) ||
+        d.document_name?.toLowerCase().includes(s) ||
+        d.category?.toLowerCase().includes(s)
+      );
+    })
     .filter((d) => (category === "all" ? true : d.category === category))
     .sort((a, b) => {
       if (sortOrder === "asc")
@@ -57,12 +57,17 @@ export default function AllDocuments() {
     });
 
   const categoryColor = {
-    beneficiary_documents: "bg-blue-100 text-blue-600",
+    beneficiary_docs: "bg-blue-100 text-blue-600",
     trust_docs: "bg-purple-100 text-purple-600",
     bank_docs: "bg-green-100 text-green-600",
     bot_minutes: "bg-red-100 text-red-600",
-    donor_docs: "bg-orange-100 text-orange-600",
+    donor_files: "bg-orange-100 text-orange-600",
+    softloan_docs: "bg-yellow-100 text-yellow-700",
     other_docs: "bg-gray-200 text-gray-700",
+  };
+
+  const prettyCategory = (cat) => {
+    return cat.replace("_", " ").toUpperCase();
   };
 
   return (
@@ -72,9 +77,9 @@ export default function AllDocuments() {
       </h1>
 
       {/* Filters */}
-      <div className="flex gap-4 mb-6">
+      <div className="flex gap-4 mb-6 flex-wrap">
         <input
-          className="border p-3 w-1/3 rounded-lg shadow-sm"
+          className="border p-3 w-72 rounded-lg shadow-sm"
           placeholder="Search document name, file, category..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -86,11 +91,12 @@ export default function AllDocuments() {
           onChange={(e) => setCategory(e.target.value)}
         >
           <option value="all">All Categories</option>
-          <option value="beneficiary_documents">Beneficiary Docs</option>
+          <option value="beneficiary_docs">Beneficiary Docs</option>
           <option value="trust_docs">Trust Docs</option>
           <option value="bank_docs">Bank Docs</option>
           <option value="bot_minutes">BOT Minutes</option>
-          <option value="donor_docs">Donor Docs</option>
+          <option value="donor_files">Donor Docs</option>
+          <option value="softloan_docs">Soft Loan Docs</option>
           <option value="other_docs">Other Docs</option>
         </select>
 
@@ -138,7 +144,7 @@ export default function AllDocuments() {
                   {doc.file_name}
                 </td>
 
-                <td className="p-3">{doc.document_name}</td>
+                <td className="p-3">{doc.document_name || "-"}</td>
 
                 <td className="p-3">
                   <span
@@ -147,7 +153,7 @@ export default function AllDocuments() {
                       "bg-gray-200 text-gray-700"
                     }`}
                   >
-                    {doc.category.replace("_", " ").toUpperCase()}
+                    {prettyCategory(doc.category)}
                   </span>
                 </td>
 
@@ -190,6 +196,14 @@ export default function AllDocuments() {
                 </td>
               </tr>
             ))}
+
+            {filteredDocs.length === 0 && (
+              <tr>
+                <td colSpan={6} className="p-6 text-center text-gray-500">
+                  No documents found
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>

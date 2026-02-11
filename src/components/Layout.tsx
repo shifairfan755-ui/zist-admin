@@ -1,43 +1,27 @@
-import { Link, Outlet } from "react-router-dom";
+import { useState } from "react";
+import { Outlet } from "react-router-dom";
+import Sidebar from "./Sidebar";
+import { useAuth } from "../context/AuthContext";
 
 export default function Layout() {
+  const { user } = useAuth();
+  const [open, setOpen] = useState(true);
+
   return (
-    <div className="flex min-h-screen bg-gray-100">
+    <div className="flex">
+      <div className={`${open ? "w-64" : "w-20"} fixed h-screen`}>
+        <Sidebar open={open} setOpen={setOpen} role={user.role} />
+      </div>
 
-      {/* SIDEBAR */}
-      <aside className="w-64 bg-[#071A36] text-white p-6 space-y-4">
+      <div className={`flex-1 ml-${open ? "64" : "20"} transition-all`}>
+        <header className="p-4 shadow bg-white">
+          Role: {user.role}
+        </header>
 
-        <h2 className="text-2xl font-bold mb-6">Zist Admin</h2>
-
-        <nav className="space-y-2">
-          <Link className="block py-2 px-3 hover:bg-[#0A234A] rounded" to="/dashboard">Dashboard</Link>
-
-          <Link className="block py-2 px-3 hover:bg-[#0A234A] rounded" to="/new-application">New Application</Link>
-          <Link className="block py-2 px-3 hover:bg-[#0A234A] rounded" to="/applications">Applications</Link>
-
-          <Link className="block py-2 px-3 hover:bg-[#0A234A] rounded" to="/beneficiaries">Beneficiaries</Link>
-
-          <Link className="block py-2 px-3 hover:bg-[#0A234A] rounded" to="/payments">Payments</Link>
-
-          <Link className="block py-2 px-3 hover:bg-[#0A234A] rounded" to="/donors">Donors</Link>
-          <Link className="block py-2 px-3 hover:bg-[#0A234A] rounded" to="/trust-documents">Trust Documents</Link>
-          <Link className="block py-2 px-3 hover:bg-[#0A234A] rounded" to="/bot-minutes">BOT Minutes</Link>
-          <Link className="block py-2 px-3 hover:bg-[#0A234A] rounded" to="/bank-documents">Bank Documents</Link>
-          <Link className="block py-2 px-3 hover:bg-[#0A234A] rounded" to="/other-documents">Other Documents</Link>
-
-          {/* USERS TAB FIXED */}
-          <Link className="block py-2 px-3 hover:bg-[#0A234A] rounded" to="/users">Users</Link>
-
-          <Link className="block py-2 px-3 hover:bg-[#0A234A] rounded" to="/import-data">Import Data</Link>
-
-          <button className="mt-6 w-full bg-red-600 py-2 rounded">Logout</button>
-        </nav>
-      </aside>
-
-      {/* MAIN CONTENT */}
-      <main className="flex-1 p-8 overflow-y-auto">
-        <Outlet />
-      </main>
+        <main className="p-6">
+          <Outlet />
+        </main>
+      </div>
     </div>
   );
 }

@@ -2,55 +2,33 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Global Theme */
-body {
-  @apply bg-bgLight text-textDark antialiased;
+/* FIX SIDEBAR SPACING */
+.menu-item {
+  @apply flex items-center gap-4 px-4 py-3 mx-2 rounded-lg cursor-pointer transition-all text-gray-300;
 }
 
-/* Premium Card Hover Effect */
-.stat-card {
-  @apply transition-all duration-300 transform hover:-translate-y-1 hover:shadow-xl;
+.menu-item:hover {
+  @apply bg-blue-700 text-white;
 }
 
-/* Gradient Presets */
-.gradient-blue {
-  background: linear-gradient(to right, #1E3A8A, #3B82F6);
+.menu-active {
+  @apply bg-blue-600 text-white;
 }
 
-.gradient-green {
-  background: linear-gradient(to right, #047857, #10B981);
+.menu-inactive {
+  @apply text-gray-300;
 }
 
-.gradient-purple {
-  background: linear-gradient(to right, #6D28D9, #A855F7);
+/* SECTION TITLES */
+.menu-section {
+  @apply px-5 pt-4 pb-1 text-xs font-semibold uppercase tracking-wider text-gray-400;
 }
 
-.gradient-orange {
-  background: linear-gradient(to right, #EA580C, #F97316);
+/* SCROLL FIX */
+.custom-sidebar-scroll::-webkit-scrollbar {
+  width: 4px;
 }
-
-/* Reusable Card Style */
-.rounded-card {
-  @apply rounded-xl;
-}
-
-.shadow-card {
-  @apply shadow-md;
-}
-
-.transition-smooth {
-  @apply transition-all duration-300 ease-in-out;
-}
-
-/* Table Hover */
-.grayLight {
-  color: #e2e8f0;
-}
-
-.grayDark {
-  color: #334155;
-}
-
-.success {
-  color: #0f9d58;
+.custom-sidebar-scroll::-webkit-scrollbar-thumb {
+  background: #1e3a8a;
+  border-radius: 10px;
 }

@@ -99,3 +99,7 @@ export const generateLoanPDF = (loan: any, installments: any[]) => {
   // -----------------------------
   doc.save(`SoftLoan_${loan.name}.pdf`);
 };
+export default function LoanPDF() {
+  return <></>;
+}
+

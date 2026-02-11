@@ -1,63 +1,66 @@
 import { useEffect, useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
-import { useNavigate, useParams } from "react-router-dom";
 
 export default function EditUser() {
   const { id } = useParams();
-  const [fullName, setFullName] = useState("");
-  const [role, setRole] = useState("staff");
   const navigate = useNavigate();
+
+  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
+  const [role, setRole] = useState("");
 
   useEffect(() => {
     loadUser();
   }, []);
 
-  const loadUser = async () => {
-    const { data } = await supabase.from("users").select("*").eq("id", id).single();
-
-    if (data) {
-      setFullName(data.full_name);
-      setRole(data.role);
-    }
-  };
-
-  const updateUser = async () => {
-    await supabase.from("users").update({
-      full_name: fullName,
+  async function loadUser() {
+    const { data } = await supabase
+      .from("user_roles")
+      .select(
+        `
       role,
-    }).eq("id", id);
+      profiles:user_id (
+        full_name,
+        email
+      )
+    `
+      )
+      .eq("user_id", id)
+      .single();
 
-    alert("User updated!");
+    setFullName(data.profiles.full_name);
+    setEmail(data.profiles.email);
+    setRole(data.role);
+  }
+
+  async function save() {
+    await supabase.from("user_roles").update({ role }).eq("user_id", id);
+    alert("Updated!");
     navigate("/users");
-  };
+  }
 
   return (
-    <div className="p-6 max-w-xl mx-auto">
-      <h1 className="text-3xl font-bold mb-6">Edit User</h1>
+    <div className="max-w-xl mx-auto p-6 bg-white shadow rounded-xl">
+      <h1 className="text-2xl font-bold mb-4">Edit User</h1>
 
-      <div className="bg-white shadow p-6 rounded-lg space-y-4">
-        <input
-          className="border p-3 w-full rounded"
-          value={fullName}
-          onChange={(e) => setFullName(e.target.value)}
-        />
+      <input disabled value={fullName} className="w-full p-2 mb-3 bg-gray-200 rounded" />
 
-        <select
-          className="border p-3 w-full rounded"
-          value={role}
-          onChange={(e) => setRole(e.target.value)}
-        >
-          <option value="admin">Admin</option>
-          <option value="staff">Staff</option>
-        </select>
+      <input disabled value={email} className="w-full p-2 mb-3 bg-gray-200 rounded" />
 
-        <button
-          onClick={updateUser}
-          className="bg-blue-600 text-white px-4 py-3 rounded w-full"
-        >
-          Save Changes
-        </button>
-      </div>
+      <select
+        value={role}
+        onChange={(e) => setRole(e.target.value)}
+        className="w-full p-2 mb-4 border rounded"
+      >
+        <option value="admin">Admin</option>
+        <option value="staff">Staff</option>
+        <option value="viewer">Viewer</option>
+      </select>
+
+      <button onClick={save} className="px-4 py-2 bg-blue-600 text-white rounded">
+        Save Changes
+      </button>
     </div>
   );
 }

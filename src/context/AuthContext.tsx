@@ -18,69 +18,41 @@ export const AuthProvider = ({ children }: any) => {
   };
 
   useEffect(() => {
-    const init = async () => {
-      setLoading(true);
+   useEffect(() => {
+  const init = async () => {
+    console.log("INIT START");
 
-      // 🔥 IMPORTANT: force Supabase to read URL tokens
-      await supabase.auth.getSession();
+    setLoading(true);
 
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+    const sessionResponse = await supabase.auth.getSession();
+    console.log("SESSION RESPONSE:", sessionResponse);
 
-      if (!session?.user) {
-        setUser(null);
-        setLoading(false);
-        return;
-      }
+    const session = sessionResponse.data.session;
 
-      const profile = await loadZistUser(session.user.email!);
-
-      setUser(
-        profile ?? {
-          email: session.user.email,
-          role: "viewer",
-          full_name: "",
-        }
-      );
-
+    if (!session?.user) {
+      console.log("NO SESSION USER");
+      setUser(null);
       setLoading(false);
-    };
+      return;
+    }
 
-    init();
+    console.log("SESSION USER FOUND:", session.user.email);
 
-    const { data: listener } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        if (!session?.user) {
-          setUser(null);
-          setLoading(false);
-          return;
-        }
+    const profile = await loadZistUser(session.user.email!);
+    console.log("PROFILE:", profile);
 
-        const profile = await loadZistUser(session.user.email!);
-
-        setUser(
-          profile ?? {
-            email: session.user.email,
-            role: "viewer",
-            full_name: "",
-          }
-        );
-
-        setLoading(false);
+    setUser(
+      profile ?? {
+        email: session.user.email,
+        role: "viewer",
+        full_name: "",
       }
     );
 
-    return () => {
-      listener.subscription.unsubscribe();
-    };
-  }, []);
+    setLoading(false);
+    console.log("INIT DONE");
+  };
 
-  return (
-    <AuthContext.Provider value={{ user, loading }}>
-      {children}
-    </AuthContext.Provider>
-  );
-};
+  init();
+}, []);
 
-export const useAuth = () => useContext(AuthContext);

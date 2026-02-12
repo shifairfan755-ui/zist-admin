@@ -17,25 +17,16 @@ export const AuthProvider = ({ children }: any) => {
     return data;
   };
 
-  const initSession = async () => {
-    try {
+  useEffect(() => {
+    const init = async () => {
       setLoading(true);
 
-      // Force Supabase to parse URL tokens
+      // 🔥 IMPORTANT: force Supabase to read URL tokens
       await supabase.auth.getSession();
 
       const {
         data: { session },
-        error,
       } = await supabase.auth.getSession();
-
-      if (error) {
-        console.error("Session error:", error);
-        await supabase.auth.signOut();
-        setUser(null);
-        setLoading(false);
-        return;
-      }
 
       if (!session?.user) {
         setUser(null);
@@ -54,19 +45,12 @@ export const AuthProvider = ({ children }: any) => {
       );
 
       setLoading(false);
-    } catch (err) {
-      console.error("Init session failed:", err);
-      await supabase.auth.signOut();
-      setUser(null);
-      setLoading(false);
-    }
-  };
+    };
 
-  useEffect(() => {
-    initSession();
+    init();
 
     const { data: listener } = supabase.auth.onAuthStateChange(
-      async (_, session) => {
+      async (_event, session) => {
         if (!session?.user) {
           setUser(null);
           setLoading(false);

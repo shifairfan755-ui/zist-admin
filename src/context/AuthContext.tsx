@@ -18,41 +18,81 @@ export const AuthProvider = ({ children }: any) => {
   };
 
   useEffect(() => {
-   useEffect(() => {
-  const init = async () => {
-    console.log("INIT START");
+    const initSession = async () => {
+      try {
+        setLoading(true);
 
-    setLoading(true);
+        // Force Supabase to parse URL tokens
+        const {
+          data: { session },
+          error,
+        } = await supabase.auth.getSession();
 
-    const sessionResponse = await supabase.auth.getSession();
-    console.log("SESSION RESPONSE:", sessionResponse);
+        if (error) {
+          console.error("Session error:", error);
+          await supabase.auth.signOut();
+          setUser(null);
+          setLoading(false);
+          return;
+        }
 
-    const session = sessionResponse.data.session;
+        if (!session?.user) {
+          setUser(null);
+          setLoading(false);
+          return;
+        }
 
-    if (!session?.user) {
-      console.log("NO SESSION USER");
-      setUser(null);
-      setLoading(false);
-      return;
-    }
+        const profile = await loadZistUser(session.user.email!);
 
-    console.log("SESSION USER FOUND:", session.user.email);
+        setUser(
+          profile ?? {
+            email: session.user.email,
+            role: "viewer",
+            full_name: "",
+          }
+        );
 
-    const profile = await loadZistUser(session.user.email!);
-    console.log("PROFILE:", profile);
-
-    setUser(
-      profile ?? {
-        email: session.user.email,
-        role: "viewer",
-        full_name: "",
+        setLoading(false);
+      } catch (err) {
+        console.error("Init session failed:", err);
+        await supabase.auth.signOut();
+        setUser(null);
+        setLoading(false);
       }
-    );
+    };
 
-    setLoading(false);
-    console.log("INIT DONE");
-  };
+    initSession();
 
-  init();
-}, []);
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (!session?.user) {
+        setUser(null);
+        setLoading(false);
+        return;
+      }
 
+      const profile = await loadZistUser(session.user.email!);
+
+      setUser(
+        profile ?? {
+          email: session.user.email,
+          role: "viewer",
+          full_name: "",
+        }
+      );
+
+      setLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  return (
+    <AuthContext.Provider value={{ user, loading }}>
+      {children}
+    </AuthContext.Provider>
+  );
+};
+
+export const useAuth = () => useContext(AuthContext);

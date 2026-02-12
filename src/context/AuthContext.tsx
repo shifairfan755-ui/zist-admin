@@ -1,10 +1,22 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 
-const AuthContext = createContext<any>(null);
+type UserType = {
+  email: string;
+  role: string;
+  full_name: string;
+} | null;
 
-export const AuthProvider = ({ children }: any) => {
-  const [user, setUser] = useState<any>(null);
+const AuthContext = createContext<{
+  user: UserType;
+  loading: boolean;
+}>({
+  user: null,
+  loading: true,
+});
+
+export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
+  const [user, setUser] = useState<UserType>(null);
   const [loading, setLoading] = useState(true);
 
   const loadZistUser = async (email: string) => {
@@ -18,23 +30,10 @@ export const AuthProvider = ({ children }: any) => {
   };
 
   useEffect(() => {
-    const initSession = async () => {
+    const init = async () => {
       try {
-        setLoading(true);
-
-        // Force Supabase to parse URL tokens
-        const {
-          data: { session },
-          error,
-        } = await supabase.auth.getSession();
-
-        if (error) {
-          console.error("Session error:", error);
-          await supabase.auth.signOut();
-          setUser(null);
-          setLoading(false);
-          return;
-        }
+        const { data } = await supabase.auth.getSession();
+        const session = data.session;
 
         if (!session?.user) {
           setUser(null);
@@ -46,46 +45,20 @@ export const AuthProvider = ({ children }: any) => {
 
         setUser(
           profile ?? {
-            email: session.user.email,
+            email: session.user.email!,
             role: "viewer",
             full_name: "",
           }
         );
-
-        setLoading(false);
       } catch (err) {
-        console.error("Init session failed:", err);
-        await supabase.auth.signOut();
+        console.error("Auth error:", err);
         setUser(null);
+      } finally {
         setLoading(false);
       }
     };
 
-    initSession();
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (!session?.user) {
-        setUser(null);
-        setLoading(false);
-        return;
-      }
-
-      const profile = await loadZistUser(session.user.email!);
-
-      setUser(
-        profile ?? {
-          email: session.user.email,
-          role: "viewer",
-          full_name: "",
-        }
-      );
-
-      setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
+    init();
   }, []);
 
   return (

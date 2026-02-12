@@ -19,7 +19,15 @@ export const AuthProvider = ({ children }: any) => {
 
   const initSession = async () => {
     try {
-      const { data, error } = await supabase.auth.getSession();
+      setLoading(true);
+
+      // Force Supabase to parse URL tokens
+      await supabase.auth.getSession();
+
+      const {
+        data: { session },
+        error,
+      } = await supabase.auth.getSession();
 
       if (error) {
         console.error("Session error:", error);
@@ -29,19 +37,17 @@ export const AuthProvider = ({ children }: any) => {
         return;
       }
 
-      const sessionUser = data?.session?.user;
-
-      if (!sessionUser) {
+      if (!session?.user) {
         setUser(null);
         setLoading(false);
         return;
       }
 
-      const profile = await loadZistUser(sessionUser.email!);
+      const profile = await loadZistUser(session.user.email!);
 
       setUser(
         profile ?? {
-          email: sessionUser.email,
+          email: session.user.email,
           role: "viewer",
           full_name: "",
         }
@@ -59,32 +65,38 @@ export const AuthProvider = ({ children }: any) => {
   useEffect(() => {
     initSession();
 
-    const initSession = async () => {
-  setLoading(true);
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      async (_, session) => {
+        if (!session?.user) {
+          setUser(null);
+          setLoading(false);
+          return;
+        }
 
-  // This forces Supabase to parse URL tokens
-  await supabase.auth.getSession();
+        const profile = await loadZistUser(session.user.email!);
 
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
+        setUser(
+          profile ?? {
+            email: session.user.email,
+            role: "viewer",
+            full_name: "",
+          }
+        );
 
-  if (!session?.user) {
-    setUser(null);
-    setLoading(false);
-    return;
-  }
+        setLoading(false);
+      }
+    );
 
-  const profile = await loadZistUser(session.user.email);
+    return () => {
+      listener.subscription.unsubscribe();
+    };
+  }, []);
 
-  setUser(
-    profile ?? {
-      email: session.user.email,
-      role: "viewer",
-      full_name: "",
-    }
+  return (
+    <AuthContext.Provider value={{ user, loading }}>
+      {children}
+    </AuthContext.Provider>
   );
-
-  setLoading(false);
 };
 
+export const useAuth = () => useContext(AuthContext);

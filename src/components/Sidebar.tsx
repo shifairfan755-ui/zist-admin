@@ -3,11 +3,16 @@ import { Link, useLocation } from "react-router-dom";
 interface SidebarProps {
   open: boolean;
   setOpen: (v: boolean) => void;
-  role: string;
+  role: string | null;
   loading: boolean;
 }
 
-export default function Sidebar({ open, setOpen, role, loading }: SidebarProps) {
+export default function Sidebar({
+  open,
+  setOpen,
+  role,
+  loading,
+}: SidebarProps) {
   const location = useLocation();
 
   if (loading) {
@@ -18,37 +23,46 @@ export default function Sidebar({ open, setOpen, role, loading }: SidebarProps) 
     );
   }
 
-  const adminMenu = [
-    { label: "Dashboard", to: "/dashboard" },
-    { label: "New Application", to: "/new-application" },
-    { label: "Applications", to: "/applications" },
-    { label: "Beneficiaries", to: "/beneficiaries" },
-    { label: "Payments", to: "/payments" },
-    { label: "Soft Loans", to: "/soft-loans" },
-    { label: "Soft Loan Dashboard", to: "/soft-loan-dashboard" },
-    { label: "Donors", to: "/donors" },
-    { label: "Donor Dashboard", to: "/donor-dashboard" },
+  const menuConfig: Record<string, any[]> = {
+    admin: [
+      { label: "Dashboard", to: "/dashboard" },
+      { label: "New Application", to: "/applications/new" },
+      { label: "Applications", to: "/applications" },
+      { label: "Beneficiaries", to: "/beneficiaries" },
+      { label: "Payments", to: "/payments" },
+      { label: "Soft Loans", to: "/soft-loans" },
+      { label: "Soft Loan Dashboard", to: "/soft-loan-dashboard" },
+      { label: "Donors", to: "/donors" },
+      { label: "Donor Dashboard", to: "/donor-dashboard" },
+      { label: "All Documents", to: "/documents/all" },
+      { label: "Upload Documents", to: "/documents/upload" },
+      { label: "Users", to: "/users" },
+      { label: "Import Data", to: "/import-data" },
+      { label: "Success Stories", to: "/success-stories" },
+    ],
 
-    // Documents
-    { label: "All Documents", to: "/documents" },
-    { label: "Upload Documents", to: "/documents/upload" },
-    { label: "Trust Documents", to: "/documents/trust" },
-    { label: "BOT Minutes", to: "/documents/bot" },
-    { label: "Bank Documents", to: "/documents/bank" },
-    { label: "Other Documents", to: "/documents/other" },
+    staff: [
+      { label: "Dashboard", to: "/dashboard" },
+      { label: "New Application", to: "/applications/new" },
+      { label: "Applications", to: "/applications" },
+      { label: "Beneficiaries", to: "/beneficiaries" },
+      { label: "Payments", to: "/payments" },
+      { label: "Soft Loans", to: "/soft-loans" },
+      { label: "Donors", to: "/donors" },
+      { label: "Success Stories", to: "/success-stories" },
+    ],
 
-    { label: "Users", to: "/users" },
-    { label: "Import Data", to: "/import-data" },
-  ];
+    viewer: [
+      { label: "Dashboard", to: "/dashboard" },
+      { label: "New Application", to: "/applications/new" },
+      { label: "Applications", to: "/applications" },
+      { label: "Beneficiaries", to: "/beneficiaries" },
+      { label: "Success Stories", to: "/success-stories" },
+    ],
+  };
 
-  const viewerMenu = [
-    { label: "Dashboard", to: "/dashboard" },
-    { label: "Applications", to: "/applications" },
-    { label: "Beneficiaries", to: "/beneficiaries" },
-    { label: "Success Stories", to: "/success-stories" },
-  ];
-
-  const menu = role === "admin" ? adminMenu : viewerMenu;
+  const normalizedRole = role?.toLowerCase() || "viewer";
+  const menu = menuConfig[normalizedRole] || menuConfig.viewer;
 
   return (
     <aside
@@ -58,45 +72,39 @@ export default function Sidebar({ open, setOpen, role, loading }: SidebarProps) 
         ${open ? "w-64" : "w-20"}
       `}
     >
-      {/* HEADER */}
       <div className="flex items-center justify-between p-6">
         {open && <h2 className="text-2xl font-bold">ZIST Admin</h2>}
-
-        {/* Mobile toggle */}
-        <button
-          onClick={() => setOpen(!open)}
-          className="lg:hidden text-white"
-        >
-          <span className="material-icons">menu</span>
-        </button>
+        <button onClick={() => setOpen(!open)}>☰</button>
       </div>
 
-      {/* ROLE */}
       {open && (
-        <p className="text-gray-300 px-6 mb-3 text-sm">Role: {role}</p>
+        <p className="text-gray-300 px-6 mb-4 text-sm">
+          Role: {normalizedRole}
+        </p>
       )}
 
-      {/* MENU ITEMS */}
       <nav className="space-y-2 px-4">
-        {menu.map((item) => (
-          <Link
-            key={item.to}
-            to={item.to}
-            className={`
-              block py-2 px-3 rounded transition
-              ${
-                location.pathname === item.to
+        {menu.map((item) => {
+          const active =
+            location.pathname === item.to ||
+            location.pathname.startsWith(item.to + "/");
+
+          return (
+            <Link
+              key={item.to}
+              to={item.to}
+              className={`block py-2 px-3 rounded transition ${
+                active
                   ? "bg-white text-black font-semibold"
                   : "hover:bg-[#0A234A]"
-              }
-            `}
-          >
-            {item.label}
-          </Link>
-        ))}
+              }`}
+            >
+              {item.label}
+            </Link>
+          );
+        })}
       </nav>
 
-      {/* LOGOUT */}
       <Link
         to="/logout"
         className="block mx-4 mt-10 mb-6 py-2 text-center bg-red-600 hover:bg-red-700 rounded"

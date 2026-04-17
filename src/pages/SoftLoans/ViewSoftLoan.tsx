@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { supabase } from "../../lib/supabaseClient";
 import { toast } from "react-hot-toast";
-import { generateLoanPDF } from "./LoanPDF"; // ✅ PDF Export
+import { generateLoanPDF } from "./LoanPDF";
 
 export default function ViewSoftLoan() {
   const { id } = useParams();
@@ -35,13 +35,13 @@ export default function ViewSoftLoan() {
   // LOAD INSTALLMENTS
   // ------------------------------
   const loadInstallments = async () => {
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from("soft_loan_installments")
       .select("*")
       .eq("loan_id", id)
       .order("date", { ascending: false });
 
-    if (!error) setInstallments(data || []);
+    setInstallments(data || []);
   };
 
   useEffect(() => {
@@ -66,12 +66,8 @@ export default function ViewSoftLoan() {
   };
 
   if (loading) return <p className="p-6">Loading...</p>;
-
   if (!loan) return <p className="p-6 text-red-600">Loan not found</p>;
 
-  // ------------------------------
-  // TOTAL PAID CALCULATION
-  // ------------------------------
   const totalPaid = installments.reduce(
     (total, i) => total + Number(i.amount || 0),
     0
@@ -97,7 +93,6 @@ export default function ViewSoftLoan() {
   return (
     <div className="p-6 max-w-4xl mx-auto">
 
-      {/* BACK BUTTON */}
       <Link to="/soft-loans" className="text-blue-600">
         ← Back to Soft Loans
       </Link>
@@ -137,34 +132,20 @@ export default function ViewSoftLoan() {
           </div>
         </div>
 
-        {/* SUMMARY BOXES */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <SummaryBox label="Total Loan" value={`₹${loan.amount?.toLocaleString()}`} />
-          <SummaryBox label="Total Paid" value={`₹${totalPaid.toLocaleString()}`} />
-          <SummaryBox
-            label="Remaining"
-            value={`₹${remaining.toLocaleString()}`}
-            highlight={remaining > 0}
-          />
-        </div>
-
-        {/* DESCRIPTION FIELDS */}
-        <DetailBox label="Recommendation" value={loan.recommendation} />
-        <DetailBox label="Cheque Number" value={loan.cheque_no} />
-
-        {/* INSTALLMENTS HEADER */}
+        {/* INSTALLMENT HEADER */}
         <div className="flex justify-between items-center mt-10 mb-4">
           <h2 className="text-xl font-bold">Installment History</h2>
 
+          {/* ✅ FIXED ROUTE */}
           <Link
-            to={`/add-installment/${loan.id}`}
+            to={`/soft-loans/installment/add/${loan.id}`}
             className="bg-green-700 text-white px-4 py-2 rounded-lg shadow hover:bg-green-800"
           >
             + Add Installment
           </Link>
         </div>
 
-        {/* INSTALLMENT TABLE */}
+        {/* INSTALLMENTS TABLE */}
         <div className="bg-gray-50 rounded-xl border shadow-sm overflow-hidden">
           <table className="w-full border-collapse text-sm">
             <thead className="bg-green-100">
@@ -184,7 +165,7 @@ export default function ViewSoftLoan() {
                 </tr>
               ) : (
                 installments.map((ins) => (
-                  <tr key={ins.id} className="hover:bg-gray-100">
+                  <tr key={ins.id}>
                     <td className="p-3 border">
                       {new Date(ins.date).toLocaleDateString()}
                     </td>
@@ -201,8 +182,10 @@ export default function ViewSoftLoan() {
 
         {/* ACTION BUTTONS */}
         <div className="mt-10 flex gap-4">
+
+          {/* ✅ FIXED ROUTE */}
           <Link
-            to={`/edit-soft-loan/${loan.id}`}
+            to={`/soft-loans/edit/${loan.id}`}
             className="bg-blue-600 text-white px-5 py-2.5 rounded-lg shadow hover:bg-blue-700"
           >
             Edit Loan
@@ -215,7 +198,6 @@ export default function ViewSoftLoan() {
             Delete Loan
           </button>
 
-          {/* PDF EXPORT BUTTON */}
           <button
             onClick={() => generateLoanPDF(loan, installments)}
             className="bg-purple-600 text-white px-5 py-2.5 rounded-lg shadow hover:bg-purple-700"
@@ -224,30 +206,6 @@ export default function ViewSoftLoan() {
           </button>
         </div>
       </div>
-    </div>
-  );
-}
-
-/* SummaryBox Component */
-function SummaryBox({ label, value, highlight = false }: any) {
-  return (
-    <div
-      className={`p-5 rounded-xl border shadow-sm ${
-        highlight ? "bg-red-50 border-red-300" : "bg-gray-50"
-      }`}
-    >
-      <p className="text-gray-500 text-sm">{label}</p>
-      <p className="text-gray-900 text-xl font-bold mt-1">{value}</p>
-    </div>
-  );
-}
-
-/* DetailBox Component */
-function DetailBox({ label, value }: any) {
-  return (
-    <div className="bg-gray-50 p-5 rounded-xl border shadow-sm mb-6">
-      <p className="text-gray-500 text-sm mb-2">{label}</p>
-      <p className="text-gray-900 whitespace-pre-line">{value || "—"}</p>
     </div>
   );
 }

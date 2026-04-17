@@ -4,41 +4,57 @@ import { supabase } from "../../lib/supabaseClient";
 import { toast } from "react-hot-toast";
 
 export default function AddInstallment() {
-  const { id } = useParams();
+  const { loanId } = useParams(); // ✅ MUST MATCH App.tsx route
   const navigate = useNavigate();
 
-  const [date, setDate] = useState("");
+  const [date, setDate] = useState(
+    new Date().toISOString().split("T")[0]
+  );
   const [amount, setAmount] = useState("");
   const [notes, setNotes] = useState("");
 
   const saveInstallment = async () => {
-    if (!date || !amount) {
-      toast.error("Please fill all required fields");
+    if (!loanId) {
+      toast.error("Invalid loan reference");
       return;
     }
 
-    const { error } = await supabase.from("soft_loan_installments").insert([
-      {
-        loan_id: id,
-        date: date,  // ✅ FIXED — matches your database column
-        amount: Number(amount),
-        notes: notes || "",
-      },
-    ]);
+    if (!amount) {
+      toast.error("Amount is required");
+      return;
+    }
+
+    const { error } = await supabase
+      .from("soft_loan_installments")
+      .insert([
+        {
+          loan_id: loanId, // ✅ REQUIRED (NOT NULL in DB)
+          date: date,
+          amount: Number(amount),
+          notes: notes || null,
+        },
+      ]);
 
     if (error) {
       console.error(error);
-      toast.error("Failed to save installment");
+      toast.error(error.message);
       return;
     }
 
     toast.success("Installment added successfully");
-    navigate(`/view-soft-loan/${id}`);
+
+    // ✅ Correct navigation route
+    navigate(`/soft-loans/view/${loanId}`);
   };
 
   return (
     <div className="p-6 max-w-3xl mx-auto">
-      <Link to={`/view-soft-loan/${id}`} className="text-blue-600">
+
+      {/* BACK BUTTON */}
+      <Link
+        to={`/soft-loans/view/${loanId}`}
+        className="text-blue-600"
+      >
         ← Back to Loan
       </Link>
 
@@ -71,7 +87,9 @@ export default function AddInstallment() {
         />
 
         {/* NOTES */}
-        <label className="block mb-3 text-gray-700 font-medium">Notes</label>
+        <label className="block mb-3 text-gray-700 font-medium">
+          Notes
+        </label>
         <textarea
           className="border p-3 rounded-lg w-full mb-6 h-28"
           value={notes}

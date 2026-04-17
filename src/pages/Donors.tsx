@@ -11,7 +11,6 @@ export default function Donors() {
   }, []);
 
   async function loadDonors() {
-    // Load all donors
     const { data: donorList, error } = await supabase
       .from("donors")
       .select("id, donor_name, phone, address, created_at")
@@ -22,19 +21,16 @@ export default function Donors() {
       return;
     }
 
-    // For each donor get donation summary
     const donorDataWithStats = await Promise.all(
-      donorList.map(async (donor) => {
+      (donorList || []).map(async (donor) => {
         const { data: donations } = await supabase
           .from("donor_donations")
           .select("amount, date_given")
           .eq("donor_id", donor.id)
           .order("date_given", { ascending: false });
 
-        const totalAmount = donations?.reduce(
-          (sum, d) => sum + Number(d.amount || 0),
-          0
-        );
+        const totalAmount =
+          donations?.reduce((sum, d) => sum + Number(d.amount || 0), 0) || 0;
 
         const lastDonation = donations?.[0]?.date_given || null;
 
@@ -51,7 +47,12 @@ export default function Donors() {
   }
 
   const filtered = donors.filter((d) =>
-    (d.donor_name + d.phone + (d.address || "") + (d.totalAmount || ""))
+    (
+      (d.donor_name || "") +
+      (d.phone || "") +
+      (d.address || "") +
+      (d.totalAmount || "")
+    )
       .toLowerCase()
       .includes(search.toLowerCase())
   );
@@ -62,8 +63,9 @@ export default function Donors() {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-green-700">Donors</h1>
 
+        {/* ✅ FIXED ROUTE */}
         <Link
-          to="/add-donor"
+          to="/donors/add"
           className="bg-blue-600 text-white px-4 py-2 rounded-lg shadow"
         >
           + Add Donor
@@ -121,8 +123,9 @@ export default function Donors() {
                   </td>
 
                   <td className="p-3 border">
+                    {/* ✅ FIXED ROUTE */}
                     <Link
-                      to={`/donor/${d.id}`}
+                      to={`/donors/view/${d.id}`}
                       className="text-blue-600 underline"
                     >
                       View

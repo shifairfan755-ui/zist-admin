@@ -8,16 +8,23 @@ export default function AddStory() {
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [tags, setTags] = useState<string[]>([]);
-  const [tagInput, setTagInput] = useState("");
+  const [category, setCategory] = useState("");
   const [images, setImages] = useState<FileList | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  async function handleSubmit(e: any) {
-    e.preventDefault();
+  async function handleSubmit(e?: any) {
+    if (e) e.preventDefault();
+
+    if (!title || !description) {
+      alert("Title and story content are required.");
+      return;
+    }
+
+    setLoading(true);
 
     let imagePaths: string[] = [];
 
-    if (images) {
+    if (images && images.length > 0) {
       imagePaths = await uploadStoryImages(Array.from(images));
     }
 
@@ -25,81 +32,118 @@ export default function AddStory() {
       {
         title,
         description,
-        tags,
-        images: imagePaths, // store ONLY internal paths
+        category,
+        images: imagePaths,
         likes: 0,
       },
     ]);
 
-    if (error) alert("Failed to save story");
-    else navigate("/success-stories");
+    setLoading(false);
+
+    if (error) {
+      console.error(error);
+      alert("Failed to save story");
+    } else {
+      navigate("/success-stories");
+    }
   }
 
   return (
-    <div className="bg-white p-8 shadow rounded-2xl max-w-3xl mx-auto">
-      <h1 className="text-2xl font-bold mb-6">Add Story</h1>
-
-      <form onSubmit={handleSubmit}>
-        <input
-          className="w-full border p-3 rounded mb-4"
-          placeholder="Story Title"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          required
-        />
-
-        <textarea
-          className="w-full border p-3 rounded mb-4 h-32"
-          placeholder="Description"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-        />
-
-        {/* TAGS */}
-        <div className="flex gap-2 mb-4">
-          <input
-            className="border p-2 rounded w-full"
-            placeholder="Add tag"
-            value={tagInput}
-            onChange={(e) => setTagInput(e.target.value)}
-          />
-          <button
-            type="button"
-            onClick={() => {
-              if (tagInput.trim()) {
-                setTags([...tags, tagInput.trim()]);
-                setTagInput("");
-              }
-            }}
-            className="px-4 bg-blue-600 text-white rounded"
-          >
-            Add
-          </button>
+    <div className="max-w-4xl mx-auto px-6 py-12">
+      <div className="bg-white rounded-3xl shadow-xl p-10">
+        {/* Header */}
+        <div className="mb-10">
+          <h1 className="text-3xl font-bold text-gray-800">
+            Add Success Story
+          </h1>
+          <p className="text-gray-500 mt-2">
+            Share an impact story that reflects the mission of ZIST.
+          </p>
         </div>
 
-        {/* TAG LIST */}
-        <div className="flex gap-2 flex-wrap mb-4">
-          {tags.map((tag, i) => (
-            <span
-              key={i}
-              className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm"
+        {/* FORM */}
+        <form onSubmit={handleSubmit} className="space-y-8">
+          {/* Title */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-600 mb-2">
+              Story Title
+            </label>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Enter story title"
+              className="w-full px-5 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none"
+            />
+          </div>
+
+          {/* Description */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-600 mb-2">
+              Story Content
+            </label>
+            <textarea
+              rows={6}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Write the full story here..."
+              className="w-full px-5 py-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none resize-none"
+            />
+          </div>
+
+          {/* Category */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-600 mb-2">
+              Category
+            </label>
+            <input
+              type="text"
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              placeholder="e.g. Education, Livestock, Medical"
+              className="w-full px-5 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none"
+            />
+          </div>
+
+          {/* Image Upload */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-600 mb-2">
+              Cover Image
+            </label>
+
+            <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center hover:border-blue-500 transition">
+              <p className="text-gray-500 text-sm mb-3">
+                Upload a high-quality image for this story
+              </p>
+              <input
+                type="file"
+                multiple
+                onChange={(e) => setImages(e.target.files)}
+                className="mx-auto"
+              />
+            </div>
+          </div>
+
+          {/* Buttons */}
+          <div className="flex justify-end gap-4 pt-6">
+            <button
+              type="button"
+              onClick={() => navigate(-1)}
+              className="px-6 py-3 rounded-xl border border-gray-300 text-gray-600 hover:bg-gray-100 transition"
             >
-              #{tag}
-            </span>
-          ))}
-        </div>
+              Cancel
+            </button>
 
-        <input
-          type="file"
-          multiple
-          onChange={(e) => setImages(e.target.files)}
-          className="mb-6"
-        />
-
-        <button className="px-6 py-3 bg-green-600 text-white rounded">
-          Save Story
-        </button>
-      </form>
+            <button
+              type="submit"
+              disabled={loading}
+              className="px-8 py-3 rounded-xl bg-blue-600 text-white font-semibold shadow-lg hover:bg-blue-700 transition transform hover:scale-[1.02] disabled:opacity-50"
+            >
+              {loading ? "Saving..." : "Save Story"}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }

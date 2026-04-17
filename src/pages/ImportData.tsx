@@ -1,32 +1,85 @@
 import { useState } from "react";
 import * as XLSX from "xlsx";
 import { supabase } from "../lib/supabaseClient";
+import { useNavigate } from "react-router-dom";
 
 export default function ImportData() {
+  const navigate = useNavigate();
+const downloadTemplate = () => {
+  let headers: string[] = [];
+
+  if (importType === "beneficiaries") {
+    headers = [
+      "ID",
+      "full_name",
+      "parentage",
+      "phone",
+      "address",
+      "category",
+      "status",
+      "cheque_no",
+      "age",
+      "district",
+      "date_of_registration",
+    ];
+  }
+
+  if (importType === "donors") {
+    headers = [
+      "donor_name",
+      "phone",
+      "address",
+    ];
+  }
+
+  if (importType === "applications") {
+    headers = [
+      "application_no",
+      "applicant_name",
+      "parentage",
+      "address",
+      "phone",
+      "requested_for",
+      "amount_requested",
+      "status",
+    ];
+  }
+
+  if (!headers.length) {
+    alert("Please select import type first.");
+    return;
+  }
+
+  const worksheet = XLSX.utils.aoa_to_sheet([headers]);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Template");
+
+  XLSX.writeFile(workbook, `${importType}_template.xlsx`);
+};
+
   const [importType, setImportType] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // SKIP DUPLICATES OPTION: Enabled
+  const [summary, setSummary] = useState<any>(null);
+
   const skipDuplicates = true;
 
-  const handleFileUpload = async (event) => {
+  const handleFileUpload = async (event: any) => {
     const file = event.target.files[0];
+
     if (!file || !importType) {
       alert("Please select import type and upload a file.");
       return;
     }
 
     setLoading(true);
+    setSummary(null);
 
     try {
-      // Read Excel/CSV
       const data = await file.arrayBuffer();
       const workbook = XLSX.read(data);
-      const sheetName = workbook.SheetNames[0];
-      const sheet = workbook.Sheets[sheetName];
-
-      // Convert to JSON
-      const rows = XLSX.utils.sheet_to_json(sheet);
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rows: any[] = XLSX.utils.sheet_to_json(sheet);
 
       if (rows.length === 0) {
         alert("Excel file is empty.");
@@ -34,20 +87,100 @@ export default function ImportData() {
         return;
       }
 
-      console.log("Parsed rows:", rows);
+      let inserted = 0;
+      let skipped = 0;
+      let failed = 0;
 
-      // Insert based on selected type
       if (importType === "beneficiaries") {
-        await importBeneficiaries(rows);
+  for (const row of rows) {
+    try {
+      const { error } = await supabase.from("beneficiaries").insert([
+        {
+          full_name: row.full_name,
+          parentage: row.parentage,
+          address: row.address,
+          phone: row.phone,
+          category: row.category,
+          quantity: row.quantity,
+          amount: row.amount,
+          progress: row.progress,
+          ben_code: row.ben_code,
+          remarks: row.remarks,
+          notes: row.notes,
+          ben_no: row.ben_no,
+          age: row.age,
+          district: row.district,
+          quantity_given: row.quantity_given,
+          current_status: row.current_status,
+          amount_sanctioned: row.amount_sanctioned,
+          start_date: row.start_date,
+          cheque_no: row.cheque_no,
+          reference_no: row.reference_no,
+        },
+      ]);
+
+      if (error) {
+        console.error(error);
+        failed++;
+      } else {
+        inserted++;
       }
+    } catch (err) {
+      console.error(err);
+      failed++;
+    }
+  }
+}
+
       if (importType === "donors") {
-        await importDonors(rows);
-      }
-      if (importType === "applications") {
-        await importApplications(rows);
+        for (const row of rows) {
+          try {
+            const { error } = await supabase.from("donors").insert([
+              {
+                donor_name: row.donor_name,
+                phone: row.phone,
+                address: row.address,
+              },
+            ]);
+
+            if (error) failed++;
+            else inserted++;
+          } catch {
+            failed++;
+          }
+        }
       }
 
-      alert("Data imported successfully!");
+      if (importType === "applications") {
+        for (const row of rows) {
+          try {
+            const { error } = await supabase.from("applications").insert([
+              {
+                application_no: row.application_no,
+                applicant_name: row.applicant_name,
+                parentage: row.parentage,
+                address: row.address,
+                phone: row.phone,
+                requested_for: row.requested_for,
+                amount_requested: row.amount_requested,
+                status: row.status,
+              },
+            ]);
+
+            if (error) failed++;
+            else inserted++;
+          } catch {
+            failed++;
+          }
+        }
+      }
+
+      setSummary({
+        total: rows.length,
+        inserted,
+        skipped,
+        failed,
+      });
     } catch (error) {
       console.error(error);
       alert("Error importing file.");
@@ -56,73 +189,10 @@ export default function ImportData() {
     setLoading(false);
   };
 
-  // ---------------------------
-  // BENEFICIARIES IMPORT
-  // ---------------------------
-  const importBeneficiaries = async (rows) => {
-    for (const row of rows) {
-      // check duplicate by ID
-      const { data: existing } = await supabase
-        .from("beneficiaries")
-        .select("ID")
-        .eq("ID", row.ID)
-        .maybeSingle();
-
-      if (existing && skipDuplicates) continue;
-
-      await supabase.from("beneficiaries").insert([
-        {
-          ID: row.ID,
-          full_name: row.full_name,
-          parentage: row.parentage,
-          phone: row.phone,
-          address: row.address,
-          category: row.category,
-          status: row.status,
-          cheque_no: row.cheque_no,
-          age: row.age,
-          district: row.district,
-          date_of_registration: row.date_of_registration,
-        },
-      ]);
-    }
-  };
-
-  // ---------------------------
-  // DONORS IMPORT
-  // ---------------------------
-  const importDonors = async (rows) => {
-    for (const row of rows) {
-      await supabase.from("donors").insert([
-        {
-          donor_name: row.donor_name,
-          phone: row.phone,
-          address: row.address,
-          amount: row.amount,
-          notes: row.notes,
-          payment_date: row.payment_date,
-        },
-      ]);
-    }
-  };
-
-  // ---------------------------
-  // APPLICATIONS IMPORT
-  // ---------------------------
-  const importApplications = async (rows) => {
-    for (const row of rows) {
-      await supabase.from("applications").insert([
-        {
-          application_no: row.application_no,
-          beneficiary_name: row.beneficiary_name,
-          parentage: row.parentage,
-          address: row.address,
-          date: row.date,
-          status: row.status,
-          remarks: row.remarks,
-        },
-      ]);
-    }
+  const goToModule = () => {
+    if (importType === "beneficiaries") navigate("/beneficiaries");
+    if (importType === "donors") navigate("/donors");
+    if (importType === "applications") navigate("/applications");
   };
 
   return (
@@ -131,20 +201,26 @@ export default function ImportData() {
 
       <div className="bg-white p-6 rounded-xl shadow max-w-xl border">
 
-        {/* SELECT TYPE */}
         <label className="font-semibold">Select Data Type</label>
-        <select
-          className="w-full p-3 border rounded mb-4"
-          value={importType}
-          onChange={(e) => setImportType(e.target.value)}
-        >
-          <option value="">Select Import Type</option>
-          <option value="beneficiaries">Beneficiaries</option>
-          <option value="donors">Donors</option>
-          <option value="applications">Applications</option>
-        </select>
+<select
+  className="w-full p-3 border rounded mb-4"
+  value={importType}
+  onChange={(e) => setImportType(e.target.value)}
+>
+  <option value="">Select Import Type</option>
+  <option value="beneficiaries">Beneficiaries</option>
+  <option value="donors">Donors</option>
+  <option value="applications">Applications</option>
+</select>
 
-        {/* FILE UPLOAD */}
+<button
+  onClick={downloadTemplate}
+  className="mb-4 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+>
+  Download Template
+</button>
+
+
         <label className="font-semibold">Upload Excel (.xlsx) or CSV</label>
         <input
           type="file"
@@ -158,6 +234,35 @@ export default function ImportData() {
             Importing… please wait
           </p>
         )}
+
+        {summary && (
+          <div className="mt-6 bg-green-50 border border-green-300 p-4 rounded-lg">
+            <p className="font-semibold text-green-700 mb-2">
+              Import Completed
+            </p>
+
+            <div className="text-sm space-y-1">
+              <p>Total Rows: {summary.total}</p>
+              <p className="text-green-700">
+                Inserted: {summary.inserted}
+              </p>
+              <p className="text-yellow-600">
+                Skipped (Duplicates): {summary.skipped}
+              </p>
+              <p className="text-red-600">
+                Failed: {summary.failed}
+              </p>
+            </div>
+
+            <button
+              onClick={goToModule}
+              className="mt-4 bg-green-600 text-white px-4 py-2 rounded shadow hover:bg-green-700"
+            >
+              View Imported Data
+            </button>
+          </div>
+        )}
+
       </div>
     </div>
   );

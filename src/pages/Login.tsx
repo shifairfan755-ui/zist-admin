@@ -9,61 +9,58 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showReset, setShowReset] = useState(false);
 
-  async function handleLogin(e: any) {
+  async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     setErrorMsg("");
 
     try {
-      // 1️⃣ LOGIN WITH SUPABASE AUTH
-      const { data: loginData, error: loginError } =
-        await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-      if (loginError) {
-        setErrorMsg(loginError.message);
+      if (error) {
+        setErrorMsg(error.message);
         setLoading(false);
         return;
       }
 
-      const authUser = loginData.user;
-
-      if (!authUser) {
-        setErrorMsg("Login failed — No user returned.");
-        setLoading(false);
-        return;
-      }
-
-      // 2️⃣ OPTIONAL: Check if this email exists in zist_users
-      const { data: userRow, error: userError } = await supabase
-        .from("zist_users")
-        .select("*")
-        .eq("email", email)
-        .maybeSingle();
-
-      if (userError || !userRow) {
-        setErrorMsg("User profile not found in zist_users.");
-        setLoading(false);
-        return;
-      }
-
-      console.log("LOGIN SUCCESS:", userRow);
-
-      // 3️⃣ DO NOT STORE ANYTHING IN LOCALSTORAGE
-      // AuthContext will detect session and fetch role automatically
-
-      // 4️⃣ REDIRECT
       navigate("/dashboard", { replace: true });
-
     } catch (err) {
       console.error(err);
       setErrorMsg("Something went wrong.");
     }
 
     setLoading(false);
+  }
+
+  async function handleResetPassword(e: React.FormEvent) {
+    e.preventDefault();
+
+    if (!email) {
+      setErrorMsg("Enter your email.");
+      return;
+    }
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: "http://localhost:5173/reset-password",
+      });
+
+      if (error) {
+        setErrorMsg(error.message);
+        return;
+      }
+
+      alert("Password reset email sent!");
+      setShowReset(false);
+    } catch (err) {
+      console.error(err);
+      setErrorMsg("Failed to send reset email.");
+    }
   }
 
   return (
@@ -79,57 +76,99 @@ export default function Login() {
     >
       <h2>ZIST Admin Login</h2>
 
-      <form onSubmit={handleLogin} style={{ marginTop: 20 }}>
-        <input
-          type="email"
-          placeholder="Email"
-          required
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          style={{
-            width: "100%",
-            padding: "10px",
-            marginBottom: "10px",
-            borderRadius: "5px",
-            border: "1px solid #ccc",
-          }}
-        />
+      {!showReset ? (
+        <form onSubmit={handleLogin} style={{ marginTop: 20 }}>
+          <input
+            type="email"
+            placeholder="Email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            style={inputStyle}
+          />
 
-        <input
-          type="password"
-          placeholder="Password"
-          required
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          style={{
-            width: "100%",
-            padding: "10px",
-            marginBottom: "10px",
-            borderRadius: "5px",
-            border: "1px solid #ccc",
-          }}
-        />
+          <input
+            type="password"
+            placeholder="Password"
+            required
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            style={inputStyle}
+          />
 
-        {errorMsg && (
-          <p style={{ color: "red", marginBottom: 10 }}>{errorMsg}</p>
-        )}
+          {errorMsg && (
+            <p style={{ color: "red", marginBottom: 10 }}>{errorMsg}</p>
+          )}
 
-        <button
-          type="submit"
-          disabled={loading}
-          style={{
-            width: "100%",
-            padding: "10px",
-            background: "#0b5ed7",
-            color: "white",
-            borderRadius: "5px",
-            border: "none",
-            cursor: "pointer",
-          }}
-        >
-          {loading ? "Logging in..." : "Login"}
-        </button>
-      </form>
+          <button type="submit" disabled={loading} style={buttonStyle}>
+            {loading ? "Logging in..." : "Login"}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setErrorMsg("");
+              setShowReset(true);
+            }}
+            style={linkStyle}
+          >
+            Forgot Password?
+          </button>
+        </form>
+      ) : (
+        <form onSubmit={handleResetPassword} style={{ marginTop: 20 }}>
+          <input
+            type="email"
+            placeholder="Enter your email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            style={inputStyle}
+          />
+
+          {errorMsg && (
+            <p style={{ color: "red", marginBottom: 10 }}>{errorMsg}</p>
+          )}
+
+          <button type="submit" style={buttonStyle}>
+            Send Reset Link
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setShowReset(false)}
+            style={linkStyle}
+          >
+            Back to Login
+          </button>
+        </form>
+      )}
     </div>
   );
 }
+
+const inputStyle = {
+  width: "100%",
+  padding: "10px",
+  marginBottom: "10px",
+  borderRadius: "5px",
+  border: "1px solid #ccc",
+};
+
+const buttonStyle = {
+  width: "100%",
+  padding: "10px",
+  background: "#0b5ed7",
+  color: "white",
+  borderRadius: "5px",
+  border: "none",
+  cursor: "pointer",
+};
+
+const linkStyle = {
+  marginTop: "10px",
+  background: "transparent",
+  border: "none",
+  color: "#0b5ed7",
+  cursor: "pointer",
+};

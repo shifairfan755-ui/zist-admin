@@ -24,18 +24,17 @@ export default function AddPayment() {
     e.preventDefault();
     setLoading(true);
 
-    const { error } = await supabase.from("payments").insert([
-      {
-        payee_name: form.payee_name,
-        category: form.category,
-        amount: Number(form.amount),
-        payment_date:
-          form.payment_date || new Date().toISOString().slice(0, 10),
-        notes: form.notes,
-        mode: form.mode,
-        created_at: new Date(),
-      },
-    ]);
+   const { error } = await supabase.from("payments").insert([
+  {
+    payee_name: form.payee_name,
+    category: form.category,
+    amount: Number(form.amount),
+    payment_date:
+      form.payment_date || new Date().toISOString().slice(0, 10),
+    notes: form.notes || null,
+  },
+]);
+
 
     if (error) {
       alert("Error saving payment");

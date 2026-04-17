@@ -17,6 +17,8 @@ export default function SoftLoans() {
   // LOAD SOFT LOANS
   // -------------------------------------
   const loadLoans = async () => {
+    setLoading(true);
+
     const { data, error } = await supabase
       .from("soft_loans")
       .select("*")
@@ -27,6 +29,7 @@ export default function SoftLoans() {
     } else {
       setLoans(data || []);
     }
+
     setLoading(false);
   };
 
@@ -52,7 +55,9 @@ export default function SoftLoans() {
   // -------------------------------------
   const toggleSelect = (id: string) => {
     setSelected((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+      prev.includes(id)
+        ? prev.filter((x) => x !== id)
+        : [...prev, id]
     );
   };
 
@@ -101,8 +106,11 @@ export default function SoftLoans() {
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
+      {/* HEADER */}
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-green-700">Soft Loans</h1>
+        <h1 className="text-3xl font-bold text-green-700">
+          Soft Loans
+        </h1>
 
         <div className="flex gap-3">
           {selected.length > 0 && (
@@ -115,7 +123,7 @@ export default function SoftLoans() {
           )}
 
           <Link
-            to="/add-soft-loan"
+            to="/soft-loans/add"
             className="bg-green-700 text-white px-4 py-2 rounded-lg shadow hover:bg-green-800"
           >
             + Add Soft Loan
@@ -123,6 +131,7 @@ export default function SoftLoans() {
         </div>
       </div>
 
+      {/* SEARCH */}
       <input
         placeholder="🔍 Search soft loans..."
         className="border p-3 rounded-lg w-full mb-4 shadow-sm"
@@ -130,6 +139,7 @@ export default function SoftLoans() {
         onChange={(e) => setSearch(e.target.value)}
       />
 
+      {/* TABLE */}
       <div className="bg-white rounded-xl shadow border overflow-hidden">
         <table className="w-full border-collapse">
           <thead className="bg-green-100">
@@ -152,7 +162,10 @@ export default function SoftLoans() {
           <tbody>
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={6} className="text-center p-4 text-gray-500">
+                <td
+                  colSpan={6}
+                  className="text-center p-4 text-gray-500"
+                >
                   No soft loans found.
                 </td>
               </tr>
@@ -162,7 +175,9 @@ export default function SoftLoans() {
               <tr
                 key={loan.id}
                 className="hover:bg-gray-50 cursor-pointer"
-                onClick={() => navigate(`/view-soft-loan/${loan.id}`)}
+                onClick={() =>
+                  navigate(`/soft-loans/view/${loan.id}`)
+                }
               >
                 <td
                   className="p-3 border"
@@ -175,18 +190,28 @@ export default function SoftLoans() {
                   />
                 </td>
 
-                <td className="p-3 border font-semibold">{loan.name}</td>
-                <td className="p-3 border">{loan.phone}</td>
-                <td className="p-3 border text-green-700 font-bold">
-                  ₹{loan.amount?.toLocaleString()}
+                <td className="p-3 border font-semibold">
+                  {loan.name}
                 </td>
-                <td className="p-3 border">{loan.status}</td>
+                <td className="p-3 border">
+                  {loan.phone}
+                </td>
+                <td className="p-3 border text-green-700 font-bold">
+                  ₹{Number(loan.amount).toLocaleString()}
+                </td>
+                <td className="p-3 border">
+                  {loan.status}
+                </td>
 
                 <td
                   className="p-3 border text-blue-600 hover:underline"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <Link to={`/view-soft-loan/${loan.id}`}>View</Link>
+                  <Link
+                    to={`/soft-loans/view/${loan.id}`}
+                  >
+                    View
+                  </Link>
                 </td>
               </tr>
             ))}

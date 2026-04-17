@@ -2,59 +2,76 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
 
+// 🔹 Debounce function
+const debounce = (fn: Function, delay = 300) => {
+  let timeout: any;
+  return (...args: any[]) => {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => fn(...args), delay);
+  };
+};
+
 export default function Payments() {
   const [payments, setPayments] = useState<any[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
-
   const [loading, setLoading] = useState(true);
 
-  /** Load all payments */
+  const debouncedSearchFn = debounce((value: string) => {
+    setDebouncedSearch(value);
+  }, 300);
+
+  const handleSearchChange = (e: any) => {
+    setSearch(e.target.value);
+    debouncedSearchFn(e.target.value);
+  };
+
   const loadPayments = async () => {
     setLoading(true);
 
-    let query = supabase.from("payments").select("*").order("payment_date", { ascending: false });
+    let query = supabase
+      .from("payments")
+      .select("*")
+      .order("payment_date", { ascending: false });
 
-    if (categoryFilter) query = query.eq("category", categoryFilter);
-    if (search) {
+    if (categoryFilter)
+      query = query.eq("category", categoryFilter);
+
+    if (debouncedSearch) {
       query = query.or(
-        `payee_name.ilike.%${search}%,notes.ilike.%${search}%,description.ilike.%${search}%`
+        `payee_name.ilike.%${debouncedSearch}%,notes.ilike.%${debouncedSearch}%,description.ilike.%${debouncedSearch}%`
       );
     }
 
     const { data, error } = await query;
 
-    if (!error && data) {
-      setPayments(data);
-    }
+    if (!error && data) setPayments(data);
 
     setLoading(false);
   };
 
   useEffect(() => {
     loadPayments();
-  }, [search, categoryFilter]);
+  }, [debouncedSearch, categoryFilter]);
 
-  /** Handle Checkbox Toggle */
   const toggleSelection = (id: string) => {
-    if (selected.includes(id)) {
-      setSelected(selected.filter((x) => x !== id));
-    } else {
-      setSelected([...selected, id]);
-    }
+    setSelected((prev) =>
+      prev.includes(id)
+        ? prev.filter((x) => x !== id)
+        : [...prev, id]
+    );
   };
 
-  /** Bulk Delete */
   const bulkDelete = async () => {
-    if (!selected.length) {
-      alert("No items selected");
-      return;
-    }
-
+    if (!selected.length) return alert("No items selected");
     if (!confirm("Delete selected payments?")) return;
 
-    const { error } = await supabase.from("payments").delete().in("id", selected);
+    const { error } = await supabase
+      .from("payments")
+      .delete()
+      .in("id", selected);
 
     if (!error) {
       alert("Deleted successfully");
@@ -63,14 +80,17 @@ export default function Payments() {
     }
   };
 
-  /** Export CSV */
   const exportCSV = () => {
     if (!payments.length) return;
 
     const header = Object.keys(payments[0]).join(",");
-    const rows = payments.map((p) => Object.values(p).join(",")).join("\n");
+    const rows = payments
+      .map((p) => Object.values(p).join(","))
+      .join("\n");
 
-    const csvContent = "data:text/csv;charset=utf-8," + header + "\n" + rows;
+    const csvContent =
+      "data:text/csv;charset=utf-8," + header + "\n" + rows;
+
     const link = document.createElement("a");
     link.href = encodeURI(csvContent);
     link.download = "payments_export.csv";
@@ -78,24 +98,62 @@ export default function Payments() {
   };
 
   if (loading)
-    return <p className="p-6 text-center text-xl font-semibold">Loading Payments...</p>;
+    return (
+      <p className="p-6 text-center text-xl font-semibold">
+        Loading Payments...
+      </p>
+    );
 
   return (
     <div className="p-6">
       {/* Header */}
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-blue-600">Payments</h1>
+      <div className="flex flex-wrap justify-between items-center mb-6 gap-4">
+        <h1 className="text-3xl font-bold text-blue-600">
+          Payments
+        </h1>
 
+        {/* 🔍 Search + Filter */}
+        <div className="flex gap-3 items-center">
+          <input
+            type="text"
+            placeholder="Search payments..."
+            value={search}
+            onChange={handleSearchChange}
+            className="border px-3 py-2 rounded-lg w-64 focus:ring-2 focus:ring-blue-500"
+          />
+
+          <select
+            value={categoryFilter}
+            onChange={(e) =>
+              setCategoryFilter(e.target.value)
+            }
+            className="border px-3 py-2 rounded-lg"
+          >
+            <option value="">All Categories</option>
+            <option value="Sheep">Sheep</option>
+            <option value="Cow">Cow</option>
+            <option value="Monthly Assistance">Monthly Assistance</option>
+            <option value="Education">Education</option>
+            <option value="Medical">Medical</option>
+            <option value="Livelihood Generation">Livelihood Generation</option>
+            <option value="Soft Loan">Soft Loan</option>
+            <option value="Salary">Salary</option>
+            <option value="Office Expense">Office Expense</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+
+        {/* Actions */}
         <div className="flex gap-3">
           <Link
-            to="/add-payment"
+            to="/payments/add"
             className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
           >
             + Add Payment
           </Link>
 
           <Link
-            to="/import-payments"
+            to="/payments/import"
             className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700"
           >
             Import
@@ -119,34 +177,7 @@ export default function Payments() {
         </div>
       </div>
 
-      {/* Search + Filters */}
-      <div className="bg-white p-4 rounded-lg shadow mb-6 flex gap-4">
-        <input
-          placeholder="Search payment, note, description..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="border p-2 rounded w-1/3"
-        />
-
-        <select
-          value={categoryFilter}
-          onChange={(e) => setCategoryFilter(e.target.value)}
-          className="border p-2 rounded"
-        >
-          <option value="">All Categories</option>
-          <option value="Education">Education</option>
-          <option value="Medical">Medical</option>
-          <option value="Livelihood Generation">Livelihood Generation</option>
-          <option value="Monthly Assistance">Monthly Assistance</option>
-          <option value="Food Kit">Food Kit</option>
-          <option value="Office Rent">Office Rent</option>
-          <option value="Salary">Salary</option>
-          <option value="Livestock">Livestock</option>
-          <option value="Other">Other</option>
-        </select>
-      </div>
-
-      {/* Payments Table */}
+      {/* Table */}
       <div className="overflow-x-auto shadow-lg rounded-lg">
         <table className="w-full border-collapse text-sm">
           <thead className="bg-blue-600 text-white">
@@ -162,7 +193,10 @@ export default function Payments() {
 
           <tbody>
             {payments.map((p) => (
-              <tr key={p.id} className="border-b hover:bg-gray-100">
+              <tr
+                key={p.id}
+                className="border-b hover:bg-gray-100"
+              >
                 <td className="p-3">
                   <input
                     type="checkbox"
@@ -172,24 +206,38 @@ export default function Payments() {
                 </td>
 
                 <td className="p-3">{p.payee_name}</td>
-                <td className="p-3">₹{p.amount?.toLocaleString()}</td>
+
+                <td className="p-3">
+                  ₹{Number(p.amount).toLocaleString()}
+                </td>
+
                 <td className="p-3">{p.category}</td>
+
                 <td className="p-3">{p.payment_date}</td>
 
                 <td className="p-3 flex gap-3">
-                  <Link to={`/view-payment/${p.id}`} className="text-blue-600 hover:underline">
+                  <Link
+                    to={`/payments/view/${p.id}`}
+                    className="text-blue-600 hover:underline"
+                  >
                     View
                   </Link>
 
-                  <Link to={`/edit-payment/${p.id}`} className="text-green-600 hover:underline">
+                  {/* FIXED EDIT ROUTE — no more dashboard redirect */}
+                  <Link
+                    to={`/payments/edit/${p.id}`}
+                    className="text-green-600 hover:underline"
+                  >
                     Edit
                   </Link>
 
                   <button
                     onClick={async () => {
                       if (!confirm("Delete this payment?")) return;
-
-                      await supabase.from("payments").delete().eq("id", p.id);
+                      await supabase
+                        .from("payments")
+                        .delete()
+                        .eq("id", p.id);
                       loadPayments();
                     }}
                     className="text-red-600 hover:underline"
@@ -202,7 +250,10 @@ export default function Payments() {
 
             {!payments.length && (
               <tr>
-                <td colSpan={6} className="p-6 text-center text-gray-600">
+                <td
+                  colSpan={6}
+                  className="p-6 text-center text-gray-600"
+                >
                   No payments found
                 </td>
               </tr>

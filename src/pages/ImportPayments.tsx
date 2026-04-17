@@ -6,7 +6,6 @@ import { useNavigate } from "react-router-dom";
 
 export default function ImportPayments() {
   const navigate = useNavigate();
-
   const [rows, setRows] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -20,12 +19,10 @@ export default function ImportPayments() {
     "notes",
   ];
 
-  /** Validate CSV/Excel structure */
   const validateColumns = (cols: string[]) => {
     return expectedColumns.every((col) => cols.includes(col));
   };
 
-  /** Handle File Upload (CSV or Excel) */
   const handleFileUpload = (e: any) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -37,10 +34,18 @@ export default function ImportPayments() {
         header: true,
         skipEmptyLines: true,
         complete: (result) => {
-          const data = result.data;
+          const data = result.data as any[];
+
+          if (!data.length) {
+            alert("❌ File is empty");
+            return;
+          }
 
           if (!validateColumns(Object.keys(data[0]))) {
-            alert("❌ Invalid file format. Required columns:\n" + expectedColumns.join(", "));
+            alert(
+              "❌ Invalid file format.\nRequired columns:\n" +
+                expectedColumns.join(", ")
+            );
             return;
           }
 
@@ -53,12 +58,19 @@ export default function ImportPayments() {
       reader.onload = (evt) => {
         const bstr = evt.target?.result;
         const wb = XLSX.read(bstr, { type: "binary" });
-        const wsname = wb.SheetNames[0];
-        const ws = wb.Sheets[wsname];
+        const ws = wb.Sheets[wb.SheetNames[0]];
         const data: any[] = XLSX.utils.sheet_to_json(ws);
 
+        if (!data.length) {
+          alert("❌ File is empty");
+          return;
+        }
+
         if (!validateColumns(Object.keys(data[0]))) {
-          alert("❌ Invalid file format. Required columns:\n" + expectedColumns.join(", "));
+          alert(
+            "❌ Invalid file format.\nRequired columns:\n" +
+              expectedColumns.join(", ")
+          );
           return;
         }
 
@@ -71,7 +83,6 @@ export default function ImportPayments() {
     }
   };
 
-  /** Upload to Supabase */
   const handleImport = async () => {
     if (rows.length === 0) {
       alert("No rows to import");
@@ -80,7 +91,6 @@ export default function ImportPayments() {
 
     setLoading(true);
 
-    // Convert amount to number
     const cleaned = rows.map((r) => ({
       payee_name: r.payee_name,
       amount: Number(r.amount),
@@ -151,8 +161,8 @@ export default function ImportPayments() {
 
           <button
             onClick={handleImport}
-            className="mt-6 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700"
             disabled={loading}
+            className="mt-6 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 disabled:opacity-50"
           >
             {loading ? "Importing..." : "Import Now"}
           </button>

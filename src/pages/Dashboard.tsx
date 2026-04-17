@@ -1,13 +1,23 @@
-supabase.from("zist_users").select("*").limit(1)
-  .then(res => console.log("TEST SELECT:", res));
-
+import CountUp from "react-countup";
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
-import useUserRole from "../lib/useUserRole";
 import CategoryChart from "../components/CategoryChart";
+import { useAuth } from "../context/AuthContext";
+import { motion } from "framer-motion";
+import { useNavigate } from "react-router-dom";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  CartesianGrid,
+} from "recharts";
 
 export default function Dashboard() {
-  const { role, loading: roleLoading } = useUserRole();
+  const { role } = useAuth();
+  const navigate = useNavigate();
 
   const [stats, setStats] = useState({
     today: 0,
@@ -17,150 +27,250 @@ export default function Dashboard() {
   });
 
   const [latestStory, setLatestStory] = useState<any>(null);
-  const [categoryData, setCategoryData] = useState([]);
-console.log("ENV TEST:", import.meta.env);
-console.log("SUPABASE URL:", import.meta.env.VITE_SUPABASE_URL);
-console.log("SUPABASE KEY:", import.meta.env.VITE_SUPABASE_ANON_KEY);
+  const [categoryData, setCategoryData] = useState<any[]>([]);
+  const [monthlyData, setMonthlyData] = useState<any[]>([]);
+  const [recentPayments, setRecentPayments] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     loadDashboard();
   }, []);
 
   async function loadDashboard() {
-    const todayStr = new Date().toISOString().split("T")[0];
+    try {
+      const now = new Date();
+      const todayStr = now.toISOString().split("T")[0];
+      const yearStart = new Date(now.getFullYear(), 0, 1);
 
-    /* TODAY */
-    const { data: todayData } = await supabase
-      .from("payments")
-      .select("amount, created_at")
-      .gte("created_at", todayStr + "T00:00:00.000Z")
-      .lte("created_at", todayStr + "T23:59:59.999Z");
+      const { data: payments } = await supabase
+        .from("payments")
+        .select("id, payee_name, amount, category, payment_date");
 
-    const todayTotal =
-      todayData?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0;
+      if (!payments) return;
 
-    /* MONTH */
-    const now = new Date();
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+      let todayTotal = 0;
+      let monthTotal = 0;
+      let yearTotal = 0;
 
-    const { data: monthData } = await supabase
-      .from("payments")
-      .select("amount, created_at")
-      .gte("created_at", monthStart);
+      const categoryCounts: Record<string, number> = {};
+      const monthMap: Record<number, number> = {};
 
-    const monthTotal =
-      monthData?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0;
+      payments.forEach((p: any) => {
+        const created = new Date(p.payment_date);
+        const monthIndex = created.getMonth();
 
-    /* YEAR */
-    const yearStart = new Date(now.getFullYear(), 0, 1).toISOString();
+        if (p.payment_date?.startsWith(todayStr))
+          todayTotal += p.amount || 0;
 
-    const { data: yearData } = await supabase
-      .from("payments")
-      .select("amount, created_at")
-      .gte("created_at", yearStart);
+        if (
+          created.getMonth() === now.getMonth() &&
+          created.getFullYear() === now.getFullYear()
+        )
+          monthTotal += p.amount || 0;
 
-    const yearTotal =
-      yearData?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0;
+        if (created >= yearStart)
+          yearTotal += p.amount || 0;
 
-    /* CATEGORIES */
-    const { data: categoryRows } = await supabase
-      .from("payments")
-      .select("category");
+        if (p.category)
+          categoryCounts[p.category] =
+            (categoryCounts[p.category] || 0) + 1;
 
-    const uniqueCategories = new Set(categoryRows?.map((x) => x.category));
-    const categoryCount = uniqueCategories.size;
+        monthMap[monthIndex] =
+          (monthMap[monthIndex] || 0) + (p.amount || 0);
+      });
 
-    setStats({
-      today: todayTotal,
-      month: monthTotal,
-      year: yearTotal,
-      categories: categoryCount,
-    });
+      // Monthly ordered Jan–Dec
+      const monthNames = [
+        "Jan","Feb","Mar","Apr","May","Jun",
+        "Jul","Aug","Sep","Oct","Nov","Dec",
+      ];
 
-    /* LATEST STORY */
-    const { data: story } = await supabase
-      .from("success_stories")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .limit(1);
+      const formattedMonthly = monthNames.map((name, index) => ({
+        month: name,
+        total: monthMap[index] || 0,
+      }));
 
-    setLatestStory(story?.[0] || null);
+      setStats({
+        today: todayTotal,
+        month: monthTotal,
+        year: yearTotal,
+        categories: Object.keys(categoryCounts).length,
+      });
 
-    /* CATEGORY CHART */
-    const counts: any = {};
-    categoryRows?.forEach((row) => {
-      counts[row.category] = (counts[row.category] || 0) + 1;
-    });
+      setCategoryData(
+        Object.keys(categoryCounts).map((key) => ({
+          name: key,
+          value: categoryCounts[key],
+        }))
+      );
 
-    const formatted = Object.keys(counts).map((key) => ({
-      name: key,
-      value: counts[key],
-    }));
+      setMonthlyData(formattedMonthly);
 
-    setCategoryData(formatted);
+      // Recent Payments (sorted by real payment date)
+      const { data: recent } = await supabase
+        .from("payments")
+        .select("id, payee_name, amount, category, payment_date")
+        .order("payment_date", { ascending: false })
+        .limit(5);
+
+      setRecentPayments(recent || []);
+
+      const { data: story } = await supabase
+        .from("success_stories")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(1);
+
+      setLatestStory(story?.[0] || null);
+
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
-    <div className="w-full px-6 py-6">
+    <div className="w-full px-8 py-8 bg-gray-50 min-h-screen">
+      <h2 className="text-3xl font-bold mb-8">Dashboard</h2>
 
-      {/* ROLE */}
-      <div className="flex justify-end text-gray-600 text-sm mb-4">
-        {roleLoading ? "Loading role…" : `Role: ${role}`}
-      </div>
-
-      <h2 className="text-3xl font-bold text-gray-900 mb-6">Dashboard</h2>
-
-      {/* STATS */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
-
-        <div className="p-6 rounded-2xl text-white shadow bg-gradient-to-r from-blue-500 to-blue-700">
-          <p className="text-sm opacity-90">Today's Spending</p>
-          <p className="text-3xl font-bold">₹{stats.today}</p>
+      {loading ? (
+        <div className="grid grid-cols-4 gap-6">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="h-28 rounded-3xl bg-gray-200 animate-pulse" />
+          ))}
         </div>
-
-        <div className="p-6 rounded-2xl text-white shadow bg-gradient-to-r from-green-500 to-green-700">
-          <p className="text-sm opacity-90">This Month</p>
-          <p className="text-3xl font-bold">₹{stats.month}</p>
-        </div>
-
-        <div className="p-6 rounded-2xl text-white shadow bg-gradient-to-r from-purple-500 to-purple-700">
-          <p className="text-sm opacity-90">This Year</p>
-          <p className="text-3xl font-bold">₹{stats.year}</p>
-        </div>
-
-        <div className="p-6 rounded-2xl text-white shadow bg-gradient-to-r from-orange-500 to-orange-700">
-          <p className="text-sm opacity-90">Total Categories</p>
-          <p className="text-3xl font-bold">₹{stats.categories}</p>
-        </div>
-      </div>
-
-      {/* CATEGORY DISTRIBUTION */}
-      <div className="bg-white shadow rounded-2xl p-6 mb-10">
-        <h3 className="text-lg font-semibold mb-4">Category Distribution</h3>
-
-        <div className="flex justify-center">
-          <div className="w-[300px] sm:w-[400px] md:w-[500px] lg:w-[600px] min-h-[320px]">
-            <CategoryChart data={categoryData} />
+      ) : (
+        <>
+          {/* STATS */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+            {[
+              { label: "Today", value: stats.today, color: "from-blue-500 to-blue-700" },
+              { label: "This Month", value: stats.month, color: "from-green-500 to-green-700" },
+              { label: "This Year", value: stats.year, color: "from-purple-500 to-purple-700" },
+              { label: "Categories", value: stats.categories, color: "from-orange-500 to-orange-700", noCurrency: true },
+            ].map((card, i) => (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.1 }}
+                className={`p-6 rounded-3xl text-white shadow-lg bg-gradient-to-r ${card.color}`}
+              >
+                <p className="text-sm opacity-90">{card.label}</p>
+                <p className="text-3xl font-bold mt-2">
+                  {card.noCurrency ? (
+                    <CountUp end={card.value} duration={1.5} />
+                  ) : (
+                    <>₹<CountUp end={card.value} duration={1.5} separator="," /></>
+                  )}
+                </p>
+              </motion.div>
+            ))}
           </div>
-        </div>
-      </div>
 
-      {/* LATEST STORY */}
-      <div className="bg-white shadow rounded-2xl p-6 mb-20">
-        <h3 className="text-lg font-semibold mb-3">Latest Success Story</h3>
+          {/* MONTHLY GRAPH */}
+          <div className="bg-white shadow-lg rounded-3xl p-8 mb-12">
+            <h3 className="text-lg font-semibold mb-4">
+              Monthly Payment Summary
+            </h3>
 
-        {latestStory ? (
-          <div className="p-4 bg-gray-100 rounded-md">
-            <p className="font-medium">{latestStory.title}</p>
-            <p className="text-sm text-gray-600">
-              {new Date(latestStory.created_at).toLocaleDateString()}
-            </p>
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={monthlyData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="month" />
+                <YAxis />
+                <Tooltip />
+                <Line
+                  type="monotone"
+                  dataKey="total"
+                  stroke="#6366f1"
+                  strokeWidth={3}
+                />
+              </LineChart>
+            </ResponsiveContainer>
           </div>
-        ) : (
-          <p className="text-gray-500">No stories available.</p>
-        )}
-      </div>
 
+          {/* CATEGORY CHART */}
+          <div className="bg-white shadow-lg rounded-3xl p-8 mb-12">
+            <h3 className="text-lg font-semibold mb-4">
+              Category Distribution
+            </h3>
+
+            <div className="flex justify-center">
+              <div className="w-full max-w-[600px] h-[350px]">
+                <CategoryChart data={categoryData} />
+              </div>
+            </div>
+          </div>
+
+          {/* RECENT PAYMENTS */}
+          <div className="bg-white shadow-lg rounded-3xl p-8 mb-12">
+            <h3 className="text-lg font-semibold mb-4">
+              Recent Payments
+            </h3>
+
+            {recentPayments.length === 0 ? (
+              <p className="text-gray-500">No recent payments.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="border-b text-gray-600 text-sm">
+                      <th className="py-3">Date</th>
+                      <th className="py-3">Name</th>
+                      <th className="py-3">Category</th>
+                      <th className="py-3 text-right">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {recentPayments.map((payment) => (
+                      <tr
+                        key={payment.id}
+                        onClick={() => navigate(`/payments/${payment.id}`)}
+                        className="border-b hover:bg-gray-100 cursor-pointer transition"
+                      >
+                        <td className="py-3">
+                          {new Date(payment.payment_date).toLocaleDateString()}
+                        </td>
+                        <td className="py-3 font-medium">
+                          {payment.payee_name}
+                        </td>
+                        <td className="py-3">
+                          {payment.category}
+                        </td>
+                        <td className="py-3 text-right font-semibold text-green-600">
+                          ₹{Number(payment.amount).toLocaleString()}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* LATEST STORY */}
+          <div className="bg-white shadow-lg rounded-3xl p-8 mb-20">
+            <h3 className="text-lg font-semibold mb-3">
+              Latest Success Story
+            </h3>
+
+            {latestStory ? (
+              <div className="p-5 bg-gray-100 rounded-xl">
+                <p className="font-medium">
+                  {latestStory.title}
+                </p>
+                <p className="text-sm text-gray-600">
+                  {new Date(latestStory.created_at).toLocaleDateString()}
+                </p>
+              </div>
+            ) : (
+              <p>No stories available.</p>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }

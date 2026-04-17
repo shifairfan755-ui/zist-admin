@@ -25,36 +25,39 @@ export default function AddSoftLoan() {
   };
 
   const addLoan = async () => {
-    if (!form.name || !form.amount) {
-      toast.error("Name and Loan Amount are required!");
-      return;
-    }
+  if (!form.name || !form.amount) {
+    toast.error("Name and Loan Amount are required!");
+    return;
+  }
 
-    setLoading(true);
+  setLoading(true);
 
-    const { error } = await supabase.from("soft_loans").insert({
+  const { error } = await supabase.from("soft_loans").insert([
+    {
       name: form.name,
-      parentage: form.parentage,
-      phone: form.phone,
-      address: form.address,
+      parentage: form.parentage || null,
+      phone: form.phone || null,
+      address: form.address || null,
       amount: Number(form.amount),
-      cheque_no: form.cheque_no,
-      recommendation: form.recommendation,
-      loan_date: form.loan_date || new Date().toISOString().split("T")[0],
+      cheque_no: form.cheque_no || null,
+      recommendation: form.recommendation || null,
+      loan_date:
+        form.loan_date || new Date().toISOString().split("T")[0],
       status: form.status,
-    });
+    },
+  ]);
 
-    setLoading(false);
+  setLoading(false);
 
-    if (error) {
-      toast.error("Failed to add soft loan");
-      console.log(error);
-      return;
-    }
+  if (error) {
+    toast.error(error.message); // show real error
+    console.log(error);
+    return;
+  }
 
-    toast.success("Soft Loan added successfully!");
-    navigate("/soft-loans");
-  };
+  toast.success("Soft Loan added successfully!");
+  navigate("/soft-loans");
+};
 
   return (
     <div className="p-6 max-w-3xl mx-auto">

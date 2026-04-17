@@ -1,92 +1,82 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 
-type UserType = {
-  email: string;
-  role: string;
-  full_name: string;
-} | null;
-
-type AuthContextType = {
-  user: UserType;
+interface AuthContextType {
+  user: any;
+  role: string | null;
   loading: boolean;
-};
+}
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
+  role: null,
   loading: true,
 });
 
-export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const [user, setUser] = useState<UserType>(null);
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [user, setUser] = useState<any>(null);
+  const [role, setRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchProfile = async (email: string) => {
-    const { data, error } = await supabase
-      .from("zist_users")
-      .select("*")
-      .eq("email", email)
-      .single();
+  useEffect(() => {
+    let mounted = true;
 
-    if (error) {
-      console.error("Profile fetch error:", error.message);
-      return null;
-    }
+    const fetchUser = async () => {
+      setLoading(true);
 
-    return data;
-  };
+      const { data } = await supabase.auth.getSession();
+      const session = data?.session;
 
-  const initialize = async () => {
-    setLoading(true);
+      if (!mounted) return;
 
-    try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      if (!session?.user?.email) {
+      if (!session?.user) {
         setUser(null);
+        setRole(null);
+        setLoading(false);
         return;
       }
 
-      const profile = await fetchProfile(session.user.email);
+      console.log("Auth user:", session.user.id);
 
-      setUser(
-        profile ?? {
-          email: session.user.email,
-          role: "viewer",
-          full_name: "",
-        }
-      );
-    } catch (err) {
-      console.error("Auth initialization error:", err);
-      setUser(null);
-    } finally {
+      setUser(session.user);
+
+      const { data: userData, error } = await supabase
+        .from("zist_users")
+        .select("role")
+        .eq("auth_id", session.user.id)
+        .maybeSingle();
+
+      if (error) {
+        console.error("Role fetch error:", error);
+      }
+
+      console.log("Role from DB:", userData?.role);
+
+      setRole(userData?.role || null);
       setLoading(false);
-    }
-  };
+    };
 
-  useEffect(() => {
-    // Initial load
-    initialize();
+    fetchUser();
 
-    // Listen for login/logout changes
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(() => {
-      initialize();
+      fetchUser();
     });
 
     return () => {
+      mounted = false;
       subscription.unsubscribe();
     };
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, loading }}>
+    <AuthContext.Provider value={{ user, role, loading }}>
       {children}
     </AuthContext.Provider>
   );
-};
+}
 
-export const useAuth = () => useContext(AuthContext);
+export function useAuth() {
+  return useContext(AuthContext);
+}

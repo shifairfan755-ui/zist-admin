@@ -1,82 +1,126 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
-import useUserRole from "../lib/useUserRole";
+import { useAuth } from "../context/AuthContext";
 
 export default function Beneficiaries() {
-  const [beneficiaries, setBeneficiaries] = useState([]);
-  const { role } = useUserRole();
+  const [beneficiaries, setBeneficiaries] = useState<any[]>([]);
+  const { role } = useAuth();
 
   useEffect(() => {
     loadBeneficiaries();
   }, []);
 
   async function loadBeneficiaries() {
-    const { data } = await supabase.from("beneficiaries").select("*");
+    const { data, error } = await supabase
+      .from("beneficiaries")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("Beneficiaries load error:", error);
+      return;
+    }
+
     setBeneficiaries(data || []);
   }
 
+  const handleDelete = async (id: number) => {
+    const confirmDelete = window.confirm(
+      "Are you sure you want to delete this beneficiary?"
+    );
+
+    if (!confirmDelete) return;
+
+    const { error } = await supabase
+      .from("beneficiaries")
+      .delete()
+      .eq("id", id);
+
+    if (error) {
+      alert("Delete failed");
+      console.error(error);
+      return;
+    }
+
+    loadBeneficiaries();
+  };
+
   return (
     <div className="p-6">
-
-      <div className="flex justify-between mb-6">
+      <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Beneficiaries</h1>
 
-        {/* Viewer cannot add beneficiaries */}
-        {role !== "Viewer" && (
+        {role === "admin" && (
           <Link
-            to="/add-beneficiary"
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg"
+            to="/beneficiaries/add"
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
           >
             + Add Beneficiary
           </Link>
         )}
       </div>
 
-      <table className="w-full border">
-        <thead>
-          <tr className="bg-gray-100 border">
-            <th className="p-2">Ben No</th>
-            <th className="p-2">Name</th>
-            <th className="p-2">Category</th>
-            <th className="p-2">Phone</th>
-            <th className="p-2">Actions</th>
-          </tr>
-        </thead>
+      <div className="bg-white shadow rounded-xl overflow-hidden">
+        <table className="w-full text-left">
+          <thead className="bg-gray-100">
+            <tr>
+              <th className="p-3">Ben No</th>
+              <th className="p-3">Name</th>
+              <th className="p-3">Category</th>
+              <th className="p-3">Phone</th>
+              <th className="p-3">Actions</th>
+            </tr>
+          </thead>
 
-        <tbody>
-          {beneficiaries.map((b: any) => (
-            <tr key={b.id} className="border">
-              <td className="p-2">{b.ben_no}</td>
-              <td className="p-2">{b.full_name}</td>
-              <td className="p-2">{b.category}</td>
-              <td className="p-2">{b.phone}</td>
+          <tbody>
+            {beneficiaries.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="p-6 text-center text-gray-500">
+                  No beneficiaries found.
+                </td>
+              </tr>
+            ) : (
+              beneficiaries.map((b) => (
+                <tr key={b.id} className="border-t hover:bg-gray-50">
+                  <td className="p-3">{b.ben_no}</td>
+                  <td className="p-3 font-medium">{b.full_name}</td>
+                  <td className="p-3">{b.category}</td>
+                  <td className="p-3">{b.phone}</td>
 
-              <td className="p-2">
-                <Link className="text-blue-600" to={`/view-beneficiary/${b.id}`}>
-                  View
-                </Link>
-
-                {role !== "Viewer" && (
-                  <>
+                  <td className="p-3 space-x-4">
+                    {/* ✅ FIXED ROUTES */}
                     <Link
-                      className="ml-3 text-green-600"
-                      to={`/edit-beneficiary/${b.id}`}
+                      to={`/beneficiaries/view/${b.id}`}
+                      className="text-blue-600 hover:underline"
                     >
-                      Edit
+                      View
                     </Link>
 
-                    <button className="ml-3 text-red-600">
-                      Delete
-                    </button>
-                  </>
-                )}
-              </td>
+                    {role === "admin" && (
+                      <>
+                        <Link
+                          to={`/beneficiaries/edit/${b.id}`}
+                          className="text-green-600 hover:underline"
+                        >
+                          Edit
+                        </Link>
 
-            </tr>
-          ))}
-        </tbody>
-      </table>
+                        <button
+                          onClick={() => handleDelete(b.id)}
+                          className="text-red-600 hover:underline"
+                        >
+                          Delete
+                        </button>
+                      </>
+                    )}
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

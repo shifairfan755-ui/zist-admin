@@ -1,23 +1,31 @@
-import CountUp from "react-countup";
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
-import CategoryChart from "../components/CategoryChart";
-import { useAuth } from "../context/AuthContext";
-import { motion } from "framer-motion";
-import { useNavigate } from "react-router-dom";
 import {
+  ResponsiveContainer,
   LineChart,
   Line,
   XAxis,
   YAxis,
-  Tooltip,
-  ResponsiveContainer,
   CartesianGrid,
+  Tooltip,
+  PieChart,
+  Pie,
+  Cell,
 } from "recharts";
 
+const COLORS = [
+  "#3B82F6",
+  "#10B981",
+  "#F59E0B",
+  "#EF4444",
+  "#8B5CF6",
+  "#14B8A6",
+  "#F97316",
+  "#6366F1",
+];
+
 export default function Dashboard() {
-  const { role } = useAuth();
-  const navigate = useNavigate();
+  const [loading, setLoading] = useState(true);
 
   const [stats, setStats] = useState({
     today: 0,
@@ -26,251 +34,347 @@ export default function Dashboard() {
     categories: 0,
   });
 
-  const [latestStory, setLatestStory] = useState<any>(null);
-  const [categoryData, setCategoryData] = useState<any[]>([]);
   const [monthlyData, setMonthlyData] = useState<any[]>([]);
+  const [categoryData, setCategoryData] = useState<any[]>([]);
   const [recentPayments, setRecentPayments] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [latestStory, setLatestStory] = useState<any>(null);
 
   useEffect(() => {
     loadDashboard();
   }, []);
 
-  async function loadDashboard() {
-    try {
-      const now = new Date();
-      const todayStr = now.toISOString().split("T")[0];
-      const yearStart = new Date(now.getFullYear(), 0, 1);
+  const loadDashboard = async () => {
+    setLoading(true);
 
-      const { data: payments } = await supabase
-        .from("payments")
-        .select("id, payee_name, amount, category, payment_date");
+    const { data: payments } = await supabase
+      .from("payments")
+      .select("*")
+      .order("payment_date", { ascending: false });
 
-      if (!payments) return;
+    const { data: stories } = await supabase
+      .from("success_stories")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(1);
 
-      let todayTotal = 0;
-      let monthTotal = 0;
-      let yearTotal = 0;
+    const today = new Date();
+    const monthNow = today.getMonth();
+    const yearNow = today.getFullYear();
+    const todayString = today.toISOString().split("T")[0];
 
-      const categoryCounts: Record<string, number> = {};
-      const monthMap: Record<number, number> = {};
+    let todayTotal = 0;
+    let monthTotal = 0;
+    let yearTotal = 0;
 
-      payments.forEach((p: any) => {
-        const created = new Date(p.payment_date);
-        const monthIndex = created.getMonth();
+    const monthMap: any = {
+      Jan: 0,
+      Feb: 0,
+      Mar: 0,
+      Apr: 0,
+      May: 0,
+      Jun: 0,
+      Jul: 0,
+      Aug: 0,
+      Sep: 0,
+      Oct: 0,
+      Nov: 0,
+      Dec: 0,
+    };
 
-        if (p.payment_date?.startsWith(todayStr))
-          todayTotal += p.amount || 0;
+    const categoryMap: any = {};
 
-        if (
-          created.getMonth() === now.getMonth() &&
-          created.getFullYear() === now.getFullYear()
-        )
-          monthTotal += p.amount || 0;
+    (payments || []).forEach((item: any) => {
+      const amount = Number(item.amount || 0);
 
-        if (created >= yearStart)
-          yearTotal += p.amount || 0;
+      if (!item.payment_date) return;
 
-        if (p.category)
-          categoryCounts[p.category] =
-            (categoryCounts[p.category] || 0) + 1;
-
-        monthMap[monthIndex] =
-          (monthMap[monthIndex] || 0) + (p.amount || 0);
+      const d = new Date(item.payment_date);
+      const month = d.toLocaleString("default", {
+        month: "short",
       });
 
-      // Monthly ordered Jan–Dec
-      const monthNames = [
-        "Jan","Feb","Mar","Apr","May","Jun",
-        "Jul","Aug","Sep","Oct","Nov","Dec",
-      ];
+      if (item.payment_date === todayString) {
+        todayTotal += amount;
+      }
 
-      const formattedMonthly = monthNames.map((name, index) => ({
-        month: name,
-        total: monthMap[index] || 0,
-      }));
+      if (
+        d.getMonth() === monthNow &&
+        d.getFullYear() === yearNow
+      ) {
+        monthTotal += amount;
+      }
 
-      setStats({
-        today: todayTotal,
-        month: monthTotal,
-        year: yearTotal,
-        categories: Object.keys(categoryCounts).length,
-      });
+      if (d.getFullYear() === yearNow) {
+        yearTotal += amount;
+      }
 
-      setCategoryData(
-        Object.keys(categoryCounts).map((key) => ({
-          name: key,
-          value: categoryCounts[key],
-        }))
-      );
+      monthMap[month] += amount;
 
-      setMonthlyData(formattedMonthly);
+      const cat = item.category || "Other";
+      categoryMap[cat] =
+        (categoryMap[cat] || 0) + amount;
+    });
 
-      // Recent Payments (sorted by real payment date)
-      const { data: recent } = await supabase
-        .from("payments")
-        .select("id, payee_name, amount, category, payment_date")
-        .order("payment_date", { ascending: false })
-        .limit(5);
+    setStats({
+      today: todayTotal,
+      month: monthTotal,
+      year: yearTotal,
+      categories: Object.keys(categoryMap).length,
+    });
 
-      setRecentPayments(recent || []);
+    setMonthlyData(
+      Object.keys(monthMap).map((key) => ({
+        month: key,
+        amount: monthMap[key],
+      }))
+    );
 
-      const { data: story } = await supabase
-        .from("success_stories")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(1);
+    setCategoryData(
+      Object.keys(categoryMap).map((key) => ({
+        name: key,
+        value: categoryMap[key],
+      }))
+    );
 
-      setLatestStory(story?.[0] || null);
+    setRecentPayments((payments || []).slice(0, 5));
+    setLatestStory(stories?.[0] || null);
 
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
+    setLoading(false);
+  };
+
+  if (loading) {
+    return (
+      <div className="p-8 text-center text-xl font-semibold">
+        Loading Dashboard...
+      </div>
+    );
   }
 
   return (
-    <div className="w-full px-8 py-8 bg-gray-50 min-h-screen">
-      <h2 className="text-3xl font-bold mb-8">Dashboard</h2>
+    <div className="p-6 bg-slate-100 min-h-screen">
+      {/* Header */}
+      <div className="mb-8">
+        <h1 className="text-4xl font-bold text-slate-800">
+          Dashboard
+        </h1>
+        <p className="text-slate-500 mt-1">
+          ZIST Admin Panel Overview
+        </p>
+      </div>
 
-      {loading ? (
-        <div className="grid grid-cols-4 gap-6">
-          {[...Array(4)].map((_, i) => (
-            <div key={i} className="h-28 rounded-3xl bg-gray-200 animate-pulse" />
-          ))}
-        </div>
-      ) : (
-        <>
-          {/* STATS */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-            {[
-              { label: "Today", value: stats.today, color: "from-blue-500 to-blue-700" },
-              { label: "This Month", value: stats.month, color: "from-green-500 to-green-700" },
-              { label: "This Year", value: stats.year, color: "from-purple-500 to-purple-700" },
-              { label: "Categories", value: stats.categories, color: "from-orange-500 to-orange-700", noCurrency: true },
-            ].map((card, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.1 }}
-                className={`p-6 rounded-3xl text-white shadow-lg bg-gradient-to-r ${card.color}`}
+      {/* KPI Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5 mb-8">
+        <Card
+          title="Today"
+          value={`₹${stats.today.toLocaleString()}`}
+          color="from-blue-500 to-blue-700"
+        />
+        <Card
+          title="This Month"
+          value={`₹${stats.month.toLocaleString()}`}
+          color="from-green-500 to-green-700"
+        />
+        <Card
+          title="This Year"
+          value={`₹${stats.year.toLocaleString()}`}
+          color="from-purple-500 to-purple-700"
+        />
+        <Card
+          title="Categories"
+          value={stats.categories}
+          color="from-orange-500 to-orange-700"
+        />
+      </div>
+
+      {/* Charts Row */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-8">
+        {/* Monthly */}
+        <div className="xl:col-span-2 bg-white rounded-2xl shadow p-6">
+          <h2 className="text-xl font-semibold mb-4 text-slate-800">
+            Monthly Payment Summary
+          </h2>
+
+          <div className="h-[320px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart
+                data={monthlyData}
+                margin={{
+                  top: 10,
+                  right: 20,
+                  left: 20,
+                  bottom: 0,
+                }}
               >
-                <p className="text-sm opacity-90">{card.label}</p>
-                <p className="text-3xl font-bold mt-2">
-                  {card.noCurrency ? (
-                    <CountUp end={card.value} duration={1.5} />
-                  ) : (
-                    <>₹<CountUp end={card.value} duration={1.5} separator="," /></>
-                  )}
-                </p>
-              </motion.div>
-            ))}
-          </div>
-
-          {/* MONTHLY GRAPH */}
-          <div className="bg-white shadow-lg rounded-3xl p-8 mb-12">
-            <h3 className="text-lg font-semibold mb-4">
-              Monthly Payment Summary
-            </h3>
-
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={monthlyData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="month" />
-                <YAxis />
-                <Tooltip />
+                <YAxis
+                  tickFormatter={(v) =>
+                    `${Math.round(v / 1000)}k`
+                  }
+                />
+                <Tooltip
+                  formatter={(v: any) =>
+                    `₹${Number(v).toLocaleString()}`
+                  }
+                />
                 <Line
                   type="monotone"
-                  dataKey="total"
-                  stroke="#6366f1"
+                  dataKey="amount"
+                  stroke="#4F46E5"
                   strokeWidth={3}
+                  dot={{ r: 4 }}
                 />
               </LineChart>
             </ResponsiveContainer>
           </div>
+        </div>
 
-          {/* CATEGORY CHART */}
-          <div className="bg-white shadow-lg rounded-3xl p-8 mb-12">
-            <h3 className="text-lg font-semibold mb-4">
-              Category Distribution
-            </h3>
+        {/* Category */}
+        <div className="bg-white rounded-2xl shadow p-6">
+          <h2 className="text-xl font-semibold mb-4 text-slate-800">
+            Category Distribution
+          </h2>
 
-            <div className="flex justify-center">
-              <div className="w-full max-w-[600px] h-[350px]">
-                <CategoryChart data={categoryData} />
+          <div className="h-[320px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={categoryData}
+                  dataKey="value"
+                  nameKey="name"
+                  innerRadius={55}
+                  outerRadius={95}
+                  paddingAngle={3}
+                >
+                  {categoryData.map((_: any, index: number) => (
+                    <Cell
+                      key={index}
+                      fill={
+                        COLORS[index % COLORS.length]
+                      }
+                    />
+                  ))}
+                </Pie>
+
+                <Tooltip
+                  formatter={(v: any) =>
+                    `₹${Number(v).toLocaleString()}`
+                  }
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+
+      {/* Bottom Row */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        {/* Recent Payments */}
+        <div className="xl:col-span-2 bg-white rounded-2xl shadow p-6">
+          <h2 className="text-xl font-semibold mb-4 text-slate-800">
+            Recent Payments
+          </h2>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b text-slate-500">
+                  <th className="text-left py-3">
+                    Date
+                  </th>
+                  <th className="text-left py-3">
+                    Name
+                  </th>
+                  <th className="text-left py-3">
+                    Category
+                  </th>
+                  <th className="text-right py-3">
+                    Amount
+                  </th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {recentPayments.map((item: any) => (
+                  <tr
+                    key={item.id}
+                    className="border-b last:border-0"
+                  >
+                    <td className="py-3">
+                      {item.payment_date}
+                    </td>
+                    <td className="py-3">
+                      {item.payee_name}
+                    </td>
+                    <td className="py-3">
+                      {item.category}
+                    </td>
+                    <td className="py-3 text-right font-medium text-green-600">
+                      ₹
+                      {Number(
+                        item.amount
+                      ).toLocaleString()}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Latest Story */}
+        <div className="bg-white rounded-2xl shadow p-6">
+          <h2 className="text-xl font-semibold mb-4 text-slate-800">
+            Latest Success Story
+          </h2>
+
+          {latestStory ? (
+            <div className="space-y-3">
+              <div className="text-lg font-semibold text-slate-800">
+                {latestStory.title}
               </div>
+
+              <div className="text-sm text-slate-500">
+                {new Date(
+                  latestStory.created_at
+                ).toLocaleDateString()}
+              </div>
+
+              <p className="text-sm text-slate-600 line-clamp-5">
+                {latestStory.description ||
+                  latestStory.content}
+              </p>
             </div>
-          </div>
+          ) : (
+            <p className="text-slate-500">
+              No success story found.
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
-          {/* RECENT PAYMENTS */}
-          <div className="bg-white shadow-lg rounded-3xl p-8 mb-12">
-            <h3 className="text-lg font-semibold mb-4">
-              Recent Payments
-            </h3>
-
-            {recentPayments.length === 0 ? (
-              <p className="text-gray-500">No recent payments.</p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left">
-                  <thead>
-                    <tr className="border-b text-gray-600 text-sm">
-                      <th className="py-3">Date</th>
-                      <th className="py-3">Name</th>
-                      <th className="py-3">Category</th>
-                      <th className="py-3 text-right">Amount</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {recentPayments.map((payment) => (
-                      <tr
-                        key={payment.id}
-                        onClick={() => navigate(`/payments/${payment.id}`)}
-                        className="border-b hover:bg-gray-100 cursor-pointer transition"
-                      >
-                        <td className="py-3">
-                          {new Date(payment.payment_date).toLocaleDateString()}
-                        </td>
-                        <td className="py-3 font-medium">
-                          {payment.payee_name}
-                        </td>
-                        <td className="py-3">
-                          {payment.category}
-                        </td>
-                        <td className="py-3 text-right font-semibold text-green-600">
-                          ₹{Number(payment.amount).toLocaleString()}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-
-          {/* LATEST STORY */}
-          <div className="bg-white shadow-lg rounded-3xl p-8 mb-20">
-            <h3 className="text-lg font-semibold mb-3">
-              Latest Success Story
-            </h3>
-
-            {latestStory ? (
-              <div className="p-5 bg-gray-100 rounded-xl">
-                <p className="font-medium">
-                  {latestStory.title}
-                </p>
-                <p className="text-sm text-gray-600">
-                  {new Date(latestStory.created_at).toLocaleDateString()}
-                </p>
-              </div>
-            ) : (
-              <p>No stories available.</p>
-            )}
-          </div>
-        </>
-      )}
+function Card({
+  title,
+  value,
+  color,
+}: {
+  title: string;
+  value: any;
+  color: string;
+}) {
+  return (
+    <div
+      className={`rounded-2xl shadow text-white p-6 bg-gradient-to-r ${color}`}
+    >
+      <p className="text-sm opacity-90">
+        {title}
+      </p>
+      <h2 className="text-3xl font-bold mt-2">
+        {value}
+      </h2>
     </div>
   );
 }

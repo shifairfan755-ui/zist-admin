@@ -1,184 +1,462 @@
-import { useEffect, useState } from "react";
+import {
+  useEffect,
+  useState,
+} from "react";
+
 import { supabase } from "../../lib/supabaseClient";
 
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+  PieChart,
+  Pie,
+  Cell,
+  Legend,
+} from "recharts";
+
 export default function SoftLoanDashboard() {
-  const [loans, setLoans] = useState<any[]>([]);
-  const [installments, setInstallments] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loans, setLoans] =
+    useState<any[]>([]);
 
-  // SAFELY PARSE DATES
-  function safeDate(d: any) {
-    if (!d) return null;
-    const dt = new Date(d);
-    return isNaN(dt.getTime()) ? null : dt;
-  }
+  const [
+    installments,
+    setInstallments,
+  ] = useState<any[]>([]);
 
-  // LOAD LOANS + INSTALLMENTS
-  const loadData = async () => {
-    const { data: loanData } = await supabase.from("soft_loans").select("*");
-
-    const { data: instData } = await supabase
-      .from("soft_loan_installments")
-      .select("*");
-
-    setLoans(loanData || []);
-    setInstallments(instData || []);
-    setLoading(false);
-  };
+  const [loading, setLoading] =
+    useState(true);
 
   useEffect(() => {
     loadData();
   }, []);
 
-  if (loading) return <p className="p-6">Loading...</p>;
+  const loadData =
+    async () => {
+      setLoading(true);
 
-  // 📌 TOTALS
-  const totalLoanAmount = loans.reduce(
-    (t, x) => t + Number(x.amount || 0),
-    0
+      const [
+        loanRes,
+        instRes,
+      ] =
+        await Promise.all([
+          supabase
+            .from(
+              "soft_loans"
+            )
+            .select("*"),
+
+          supabase
+            .from(
+              "soft_loan_installments"
+            )
+            .select("*"),
+        ]);
+
+      setLoans(
+        loanRes.data ||
+          []
+      );
+
+      setInstallments(
+        instRes.data ||
+          []
+      );
+
+      setLoading(false);
+    };
+
+  const safeDate = (
+    val: any
+  ) => {
+    if (!val)
+      return null;
+
+    const d =
+      new Date(
+        val
+      );
+
+    return isNaN(
+      d.getTime()
+    )
+      ? null
+      : d;
+  };
+
+  if (loading) {
+    return (
+      <div className="p-6 text-center font-semibold">
+        Loading...
+      </div>
+    );
+  }
+
+  /* Totals */
+  const totalLoan =
+    loans.reduce(
+      (
+        sum,
+        item
+      ) =>
+        sum +
+        Number(
+          item.amount ||
+            0
+        ),
+      0
+    );
+
+  const recovered =
+    installments.reduce(
+      (
+        sum,
+        item
+      ) =>
+        sum +
+        Number(
+          item.amount ||
+            0
+        ),
+      0
+    );
+
+  const pending =
+    totalLoan -
+    recovered;
+
+  const defaulters =
+    loans.filter(
+      (
+        l
+      ) =>
+        l.status ===
+        "Defaulter"
+    ).length;
+
+  const activeLoans =
+    loans.filter(
+      (
+        l
+      ) =>
+        l.status ===
+        "Paying in Installments"
+    ).length;
+
+  /* Monthly Chart */
+  const monthMap: any =
+    {};
+
+  installments.forEach(
+    (item) => {
+      const d =
+        safeDate(
+          item.date
+        );
+
+      if (!d)
+        return;
+
+      const key =
+        d.toLocaleString(
+          "default",
+          {
+            month:
+              "short",
+            year: "2-digit",
+          }
+        );
+
+      monthMap[key] =
+        (monthMap[
+          key
+        ] ||
+          0) +
+        Number(
+          item.amount ||
+            0
+        );
+    }
   );
 
-  const totalInstallmentPaid = installments.reduce(
-    (t, x) => t + Number(x.amount || 0),
-    0
+  const monthlyData =
+    Object.entries(
+      monthMap
+    ).map(
+      ([
+        month,
+        amount,
+      ]) => ({
+        month,
+        amount,
+      })
+    );
+
+  /* Status Pie */
+  const statusMap: any =
+    {};
+
+  loans.forEach(
+    (item) => {
+      const key =
+        item.status ||
+        "Unknown";
+
+      statusMap[key] =
+        (statusMap[
+          key
+        ] ||
+          0) + 1;
+    }
   );
 
-  const outstanding = totalLoanAmount - totalInstallmentPaid;
+  const statusData =
+    Object.entries(
+      statusMap
+    ).map(
+      ([
+        name,
+        value,
+      ]) => ({
+        name,
+        value,
+      })
+    );
 
-  const defaulters = loans.filter((l) => l.status === "Defaulter").length;
-
-  // 📌 MONTHLY RECOVERY (NO NAN)
-  const monthData = installments
-    .map((ins) => {
-      const dt = safeDate(ins.date);
-      if (!dt) return null;
-
-      return {
-        month: dt.toLocaleString("default", {
-          month: "short",
-          year: "numeric",
-        }),
-        amount: Number(ins.amount),
-      };
-    })
-    .filter(Boolean); // remove nulls
-
-  // GROUP BY MONTH
-  const monthlyTotals: any = {};
-  monthData.forEach((x) => {
-    monthlyTotals[x.month] = (monthlyTotals[x.month] || 0) + x.amount;
-  });
-
-  const chartMonthly = Object.entries(monthlyTotals).map(([month, amount]) => ({
-    month,
-    amount,
-  }));
-
-  // 📌 STATUS DISTRIBUTION (PIE)
-  const statusCounts: any = {};
-  loans.forEach((l) => {
-    statusCounts[l.status] = (statusCounts[l.status] || 0) + 1;
-  });
-
-  const statusChart = Object.entries(statusCounts).map(([name, value]) => ({
-    name,
-    value,
-  }));
+  const COLORS = [
+    "#16a34a",
+    "#dc2626",
+    "#f59e0b",
+    "#2563eb",
+    "#64748b",
+  ];
 
   return (
-    <div className="p-6">
-      <h1 className="text-3xl font-bold text-green-700 mb-6">
-        Soft Loan Dashboard
-      </h1>
+    <div className="p-3 md:p-6">
+      {/* Header */}
+      <div className="mb-6">
+        <h1 className="text-2xl md:text-3xl font-bold text-slate-800">
+          Soft Loan
+          Dashboard
+        </h1>
 
-      {/* STATS CARDS */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10">
-        <Card title="Total Loan Amount" value={`₹${totalLoanAmount.toLocaleString()}`} />
-        <Card title="Total Installments Paid" value={`₹${totalInstallmentPaid.toLocaleString()}`} />
-        <Card title="Outstanding Balance" value={`₹${outstanding.toLocaleString()}`} />
-        <Card title="Defaulters" value={defaulters} valueClass="text-red-600" />
+        <p className="text-sm text-slate-500 mt-1">
+          Analytics,
+          recovery and
+          portfolio
+          performance
+        </p>
       </div>
 
-      {/* MONTHLY RECOVERY CHART */}
-      <section className="bg-white p-6 rounded-xl shadow border mb-10">
-        <h2 className="text-xl font-bold mb-4">Monthly Recovery</h2>
+      {/* Stats */}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
+        <Card
+          title="Total Loan"
+          value={`₹${totalLoan.toLocaleString()}`}
+        />
 
-        {chartMonthly.length === 0 ? (
-          <p className="text-gray-500">No installment data available</p>
-        ) : (
-          <BarChartUI data={chartMonthly} />
-        )}
-      </section>
+        <Card
+          title="Recovered"
+          value={`₹${recovered.toLocaleString()}`}
+        />
 
-      {/* STATUS PIE CHART */}
-      <section className="bg-white p-6 rounded-xl shadow border">
-        <h2 className="text-xl font-bold mb-4">Loan Status Distribution</h2>
+        <Card
+          title="Pending"
+          value={`₹${pending.toLocaleString()}`}
+        />
 
-        {statusChart.length === 0 ? (
-          <p className="text-gray-500">No status data available</p>
-        ) : (
-          <PieChartUI data={statusChart} />
-        )}
-      </section>
+        <Card
+          title="Defaulters"
+          value={defaulters}
+          danger
+        />
+
+        <Card
+          title="Active"
+          value={
+            activeLoans
+          }
+        />
+      </div>
+
+      {/* Charts */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        {/* Monthly Recovery */}
+        <section className="bg-white rounded-2xl shadow p-4 md:p-6">
+          <h2 className="text-lg font-semibold mb-4">
+            Monthly
+            Recovery
+          </h2>
+
+          {monthlyData.length ===
+          0 ? (
+            <Empty />
+          ) : (
+            <div className="h-[320px]">
+              <ResponsiveContainer
+                width="100%"
+                height="100%"
+              >
+                <BarChart
+                  data={
+                    monthlyData
+                  }
+                >
+                  <CartesianGrid strokeDasharray="3 3" />
+
+                  <XAxis dataKey="month" />
+
+                  <YAxis />
+
+                  <Tooltip />
+
+                  <Bar dataKey="amount" radius={[8, 8, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </section>
+
+        {/* Status */}
+        <section className="bg-white rounded-2xl shadow p-4 md:p-6">
+          <h2 className="text-lg font-semibold mb-4">
+            Loan Status
+            Distribution
+          </h2>
+
+          {statusData.length ===
+          0 ? (
+            <Empty />
+          ) : (
+            <div className="h-[320px]">
+              <ResponsiveContainer
+                width="100%"
+                height="100%"
+              >
+                <PieChart>
+                  <Pie
+                    data={
+                      statusData
+                    }
+                    dataKey="value"
+                    nameKey="name"
+                    outerRadius={100}
+                    label
+                  >
+                    {statusData.map(
+                      (
+                        _,
+                        i
+                      ) => (
+                        <Cell
+                          key={
+                            i
+                          }
+                          fill={
+                            COLORS[
+                              i %
+                                COLORS.length
+                            ]
+                          }
+                        />
+                      )
+                    )}
+                  </Pie>
+
+                  <Legend />
+
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </section>
+      </div>
+
+      {/* Bottom Summary */}
+      <div className="mt-6 bg-white rounded-2xl shadow p-4 md:p-6">
+        <h2 className="text-lg font-semibold mb-4">
+          Portfolio
+          Summary
+        </h2>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+          <Summary
+            label="Recovery Rate"
+            value={`${totalLoan > 0 ? Math.round((recovered / totalLoan) * 100) : 0}%`}
+          />
+
+          <Summary
+            label="Total Cases"
+            value={
+              loans.length
+            }
+          />
+
+          <Summary
+            label="Installments Records"
+            value={
+              installments.length
+            }
+          />
+        </div>
+      </div>
     </div>
   );
 }
 
-/* CARD UI */
-function Card({ title, value, valueClass = "" }: any) {
+/* Reusable */
+
+function Card({
+  title,
+  value,
+  danger = false,
+}: any) {
   return (
-    <div className="bg-white p-6 border shadow rounded-xl">
-      <p className="text-gray-500">{title}</p>
-      <p className={`text-2xl font-bold mt-2 ${valueClass}`}>{value}</p>
+    <div className="bg-white rounded-2xl shadow p-4">
+      <p className="text-xs text-slate-500">
+        {title}
+      </p>
+
+      <h3
+        className={`text-lg font-bold mt-1 ${
+          danger
+            ? "text-red-600"
+            : "text-slate-800"
+        }`}
+      >
+        {value}
+      </h3>
     </div>
   );
 }
 
-/* BAR CHART */
-import {
-  BarChart,
-  CartesianGrid,
-  XAxis,
-  YAxis,
-  Tooltip,
-  Bar,
-} from "recharts";
-
-function BarChartUI({ data }: any) {
+function Summary({
+  label,
+  value,
+}: any) {
   return (
-    <BarChart width={800} height={300} data={data}>
-      <CartesianGrid strokeDasharray="3 3" />
-      <XAxis dataKey="month" />
-      <YAxis />
-      <Tooltip />
-      <Bar dataKey="amount" fill="#0fbf64" />
-    </BarChart>
+    <div className="rounded-xl bg-slate-50 p-4">
+      <p className="text-slate-500">
+        {label}
+      </p>
+
+      <p className="font-bold text-slate-800 mt-1">
+        {value}
+      </p>
+    </div>
   );
 }
 
-/* PIE CHART */
-import { PieChart, Pie, Cell, Legend, ResponsiveContainer } from "recharts";
-
-const COLORS = ["#2ecc71", "#e74c3c", "#f1c40f", "#3498db"];
-
-function PieChartUI({ data }: any) {
+function Empty() {
   return (
-    <ResponsiveContainer width="100%" height={300}>
-      <PieChart>
-        <Pie
-          dataKey="value"
-          data={data}
-          cx="50%"
-          cy="50%"
-          outerRadius={100}
-          label
-        >
-          {data.map((_: any, index: number) => (
-            <Cell key={index} fill={COLORS[index % COLORS.length]} />
-          ))}
-        </Pie>
-        <Legend />
-      </PieChart>
-    </ResponsiveContainer>
+    <div className="h-full flex items-center justify-center text-slate-500">
+      No data
+      available
+    </div>
   );
 }

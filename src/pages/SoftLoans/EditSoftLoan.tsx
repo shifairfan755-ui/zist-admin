@@ -1,160 +1,492 @@
-import { useState, useEffect } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import {
+  useState,
+  useEffect,
+} from "react";
+
+import {
+  useParams,
+  useNavigate,
+  Link,
+} from "react-router-dom";
+
 import { supabase } from "../../lib/supabaseClient";
 import { toast } from "react-hot-toast";
 
 export default function EditSoftLoan() {
-  const { id } = useParams();
-  const navigate = useNavigate();
+  const { id } =
+    useParams();
 
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const navigate =
+    useNavigate();
 
-  const [form, setForm] = useState({
-    name: "",
-    parentage: "",
-    phone: "",
-    address: "",
-    amount: "",
-    cheque_no: "",
-    recommendation: "",
-    loan_date: "",
-    status: "",
-  });
+  const [loading, setLoading] =
+    useState(true);
 
-  const loadLoan = async () => {
-    const { data, error } = await supabase
-      .from("soft_loans")
-      .select("*")
-      .eq("id", id)
-      .single();
+  const [saving, setSaving] =
+    useState(false);
 
-    if (error || !data) {
-      toast.error("Loan not found");
-      navigate("/soft-loans");
-      return;
-    }
-
-    setForm({
-      name: data.name,
-      parentage: data.parentage,
-      phone: data.phone,
-      address: data.address,
-      amount: data.amount,
-      cheque_no: data.cheque_no,
-      recommendation: data.recommendation,
-      loan_date: data.loan_date,
-      status: data.status,
+  const [form, setForm] =
+    useState({
+      name: "",
+      parentage: "",
+      phone: "",
+      address: "",
+      amount: "",
+      cheque_no: "",
+      recommendation:
+        "",
+      loan_date: "",
+      status:
+        "Paying in Installments",
+      notes: "",
     });
-
-    setLoading(false);
-  };
 
   useEffect(() => {
     loadLoan();
   }, [id]);
 
-  const handleChange = (e: any) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+  const loadLoan =
+    async () => {
+      const {
+        data,
+        error,
+      } =
+        await supabase
+          .from(
+            "soft_loans"
+          )
+          .select("*")
+          .eq("id", id)
+          .single();
+
+      if (
+        error ||
+        !data
+      ) {
+        toast.error(
+          "Loan not found"
+        );
+
+        navigate(
+          "/soft-loans"
+        );
+
+        return;
+      }
+
+      setForm({
+        name:
+          data.name ||
+          "",
+        parentage:
+          data.parentage ||
+          "",
+        phone:
+          data.phone ||
+          "",
+        address:
+          data.address ||
+          "",
+        amount:
+          data.amount ||
+          "",
+        cheque_no:
+          data.cheque_no ||
+          "",
+        recommendation:
+          data.recommendation ||
+          "",
+        loan_date:
+          data.loan_date ||
+          "",
+        status:
+          data.status ||
+          "Paying in Installments",
+        notes:
+          data.notes ||
+          "",
+      });
+
+      setLoading(false);
+    };
+
+  const handleChange = (
+    e: any
+  ) => {
+    setForm({
+      ...form,
+      [e.target.name]:
+        e.target.value,
+    });
   };
 
-  const updateLoan = async () => {
-    if (!form.name || !form.amount) {
-      toast.error("Name and Loan Amount are required!");
-      return;
-    }
+  const updateLoan =
+    async (
+      e: any
+    ) => {
+      e.preventDefault();
 
-    setSaving(true);
+      if (
+        !form.name ||
+        !form.amount
+      ) {
+        toast.error(
+          "Name and amount are required"
+        );
+        return;
+      }
 
-    const { error } = await supabase
-      .from("soft_loans")
-      .update({
-        name: form.name,
-        parentage: form.parentage,
-        phone: form.phone,
-        address: form.address,
-        amount: Number(form.amount),
-        cheque_no: form.cheque_no,
-        recommendation: form.recommendation,
-        loan_date: form.loan_date,
-        status: form.status,
-      })
-      .eq("id", id);
+      setSaving(true);
 
-    setSaving(false);
+      const {
+        error,
+      } =
+        await supabase
+          .from(
+            "soft_loans"
+          )
+          .update({
+            name:
+              form.name,
+            parentage:
+              form.parentage ||
+              null,
+            phone:
+              form.phone ||
+              null,
+            address:
+              form.address ||
+              null,
+            amount:
+              Number(
+                form.amount
+              ),
+            cheque_no:
+              form.cheque_no ||
+              null,
+            recommendation:
+              form.recommendation ||
+              null,
+            loan_date:
+              form.loan_date ||
+              null,
+            status:
+              form.status,
+            notes:
+              form.notes ||
+              null,
+            updated_at:
+              new Date(),
+          })
+          .eq("id", id);
 
-    if (error) {
-      toast.error("Update failed");
-      return;
-    }
+      setSaving(false);
 
-    toast.success("Soft Loan updated successfully!");
-    navigate(`/view-soft-loan/${id}`);
-  };
+      if (error) {
+        toast.error(
+          "Update failed"
+        );
+        return;
+      }
 
-  if (loading) return <p className="p-6">Loading...</p>;
+      toast.success(
+        "Loan updated successfully"
+      );
+
+      navigate(
+        `/soft-loans/view/${id}`
+      );
+    };
+
+  if (loading) {
+    return (
+      <div className="p-6 text-center font-semibold">
+        Loading...
+      </div>
+    );
+  }
 
   return (
-    <div className="p-6 max-w-3xl mx-auto">
-
-      <Link to={`/view-soft-loan/${id}`} className="text-blue-600">
-        ← Back to Loan Details
+    <div className="p-3 md:p-6 max-w-5xl mx-auto">
+      {/* Back */}
+      <Link
+        to={`/soft-loans/view/${id}`}
+        className="text-blue-600 text-sm font-medium"
+      >
+        ← Back to Loan
+        Details
       </Link>
 
-      <h1 className="text-3xl font-bold text-green-700 mt-3 mb-6">
-        Edit Soft Loan
-      </h1>
+      {/* Header */}
+      <div className="mt-4 mb-6">
+        <h1 className="text-2xl md:text-3xl font-bold text-slate-800">
+          Edit Soft Loan
+        </h1>
 
-      <div className="bg-white p-6 rounded-xl shadow border space-y-6">
-
-        <InputField label="Full Name" name="name" value={form.name} onChange={handleChange} />
-        <InputField label="Parentage" name="parentage" value={form.parentage} onChange={handleChange} />
-        <InputField label="Phone Number" name="phone" value={form.phone} onChange={handleChange} />
-        <InputField label="Address" name="address" value={form.address} onChange={handleChange} />
-        <InputField label="Loan Amount" type="number" name="amount" value={form.amount} onChange={handleChange} />
-
-        <InputField label="Cheque Number" name="cheque_no" value={form.cheque_no} onChange={handleChange} />
-        <InputField label="Recommendation" name="recommendation" value={form.recommendation} onChange={handleChange} />
-        <InputField label="Loan Date" type="date" name="loan_date" value={form.loan_date} onChange={handleChange} />
-
-        <div>
-          <label className="text-gray-600 text-sm">Status</label>
-          <select
-            name="status"
-            value={form.status}
-            onChange={handleChange}
-            className="border p-3 rounded-lg w-full mt-1"
-          >
-            <option value="Paid on Time">Paid on Time</option>
-            <option value="Defaulter">Defaulter</option>
-            <option value="Paying in Installments">Paying in Installments</option>
-            <option value="Closed as Imdaad">Closed as Imdaad</option>
-          </select>
-        </div>
-
-        <button
-          onClick={updateLoan}
-          disabled={saving}
-          className="bg-blue-600 text-white px-5 py-3 rounded-lg shadow hover:bg-blue-700 w-full text-lg"
-        >
-          {saving ? "Saving..." : "Update Loan"}
-        </button>
+        <p className="text-sm text-slate-500 mt-1">
+          Update borrower
+          and loan
+          information
+        </p>
       </div>
+
+      <form
+        onSubmit={
+          updateLoan
+        }
+        className="bg-white rounded-2xl shadow p-4 md:p-8 space-y-8"
+      >
+        {/* Borrower */}
+        <section>
+          <h2 className="text-lg font-semibold mb-4">
+            Borrower Details
+          </h2>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Input
+              label="Full Name"
+              name="name"
+              value={
+                form.name
+              }
+              onChange={
+                handleChange
+              }
+              required
+            />
+
+            <Input
+              label="Parentage"
+              name="parentage"
+              value={
+                form.parentage
+              }
+              onChange={
+                handleChange
+              }
+            />
+
+            <Input
+              label="Phone Number"
+              name="phone"
+              value={
+                form.phone
+              }
+              onChange={
+                handleChange
+              }
+            />
+
+            <Input
+              label="Address"
+              name="address"
+              value={
+                form.address
+              }
+              onChange={
+                handleChange
+              }
+            />
+          </div>
+        </section>
+
+        {/* Loan */}
+        <section>
+          <h2 className="text-lg font-semibold mb-4">
+            Loan Details
+          </h2>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Input
+              label="Loan Amount"
+              type="number"
+              name="amount"
+              value={
+                form.amount
+              }
+              onChange={
+                handleChange
+              }
+              required
+            />
+
+            <Input
+              label="Cheque Number"
+              name="cheque_no"
+              value={
+                form.cheque_no
+              }
+              onChange={
+                handleChange
+              }
+            />
+
+            <Input
+              label="Loan Date"
+              type="date"
+              name="loan_date"
+              value={
+                form.loan_date
+              }
+              onChange={
+                handleChange
+              }
+            />
+
+            <Select
+              label="Status"
+              name="status"
+              value={
+                form.status
+              }
+              onChange={
+                handleChange
+              }
+              options={[
+                "Paid on Time",
+                "Defaulter",
+                "Paying in Installments",
+                "Closed as Imdaad",
+              ]}
+            />
+
+            <Input
+              label="Recommendation"
+              name="recommendation"
+              value={
+                form.recommendation
+              }
+              onChange={
+                handleChange
+              }
+            />
+          </div>
+        </section>
+
+        {/* Notes */}
+        <section>
+          <h2 className="text-lg font-semibold mb-4">
+            Notes
+          </h2>
+
+          <TextArea
+            label="Additional Notes"
+            name="notes"
+            value={
+              form.notes
+            }
+            onChange={
+              handleChange
+            }
+            rows={4}
+          />
+        </section>
+
+        {/* Buttons */}
+        <div className="flex flex-col-reverse md:flex-row gap-3">
+          <button
+            type="button"
+            onClick={() =>
+              navigate(
+                `/soft-loans/view/${id}`
+              )
+            }
+            className="w-full md:w-auto px-5 py-3 rounded-xl border hover:bg-slate-50"
+          >
+            Cancel
+          </button>
+
+          <button
+            type="submit"
+            disabled={
+              saving
+            }
+            className="w-full md:w-auto px-6 py-3 rounded-xl bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60"
+          >
+            {saving
+              ? "Saving..."
+              : "Update Loan"}
+          </button>
+        </div>
+      </form>
     </div>
   );
 }
 
-/* Input Reusable Component */
-function InputField({ label, name, value, onChange, type = "text" }: any) {
+/* Reusable */
+
+function Input(
+  props: any
+) {
   return (
     <div>
-      <label className="text-gray-600 text-sm">{label}</label>
+      <label className="block text-sm font-medium mb-2">
+        {props.label}
+        {props.required && (
+          <span className="text-red-500 ml-1">
+            *
+          </span>
+        )}
+      </label>
+
       <input
-        type={type}
-        name={name}
-        value={value}
-        onChange={onChange}
-        className="border p-3 rounded-lg w-full mt-1"
+        {...props}
+        className="w-full rounded-xl border px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500"
+      />
+    </div>
+  );
+}
+
+function Select(
+  props: any
+) {
+  return (
+    <div>
+      <label className="block text-sm font-medium mb-2">
+        {props.label}
+      </label>
+
+      <select
+        name={
+          props.name
+        }
+        value={
+          props.value
+        }
+        onChange={
+          props.onChange
+        }
+        className="w-full rounded-xl border px-4 py-3"
+      >
+        {props.options.map(
+          (
+            item: string
+          ) => (
+            <option
+              key={item}
+              value={item}
+            >
+              {item}
+            </option>
+          )
+        )}
+      </select>
+    </div>
+  );
+}
+
+function TextArea(
+  props: any
+) {
+  return (
+    <div>
+      <label className="block text-sm font-medium mb-2">
+        {props.label}
+      </label>
+
+      <textarea
+        {...props}
+        className="w-full rounded-xl border px-4 py-3 resize-none outline-none focus:ring-2 focus:ring-blue-500"
       />
     </div>
   );

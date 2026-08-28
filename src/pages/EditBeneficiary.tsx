@@ -1,327 +1,669 @@
 import { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import {
+  useParams,
+  useNavigate,
+} from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
 
 export default function EditBeneficiary() {
   const { id } = useParams();
   const navigate = useNavigate();
 
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] =
+    useState(true);
 
-  const [photoFile, setPhotoFile] = useState<File | null>(null);
-  const [oldPhotoPath, setOldPhotoPath] = useState<string | null>(null);
+  const [
+    photoFile,
+    setPhotoFile,
+  ] = useState<File | null>(
+    null
+  );
 
-  const [form, setForm] = useState({
-    ben_no: "",
-    full_name: "",
-    parentage: "",
-    phone: "",
-    address: "",
-    category: "",
-    current_status: "",
-    quantity: "",
-    amount: "",
-    remarks: "",
-    notes: "",
-    age: "",
-    district: "",
-    amount_sanctioned: "",
-    photo_url: "",
-  });
+  const [
+    oldPhotoPath,
+    setOldPhotoPath,
+  ] = useState<string | null>(
+    null
+  );
 
-  /** Load beneficiary data */
-  const loadBeneficiary = async () => {
-    const { data, error } = await supabase
-      .from("beneficiaries")
-      .select("*")
-      .eq("id", id)
-      .single();
-
-    if (error || !data) {
-      alert("Beneficiary not found");
-      navigate("/beneficiaries");
-      return;
-    }
-
-    setForm({
-      ben_no: data.ben_no || "",
-      full_name: data.full_name || "",
-      parentage: data.parentage || "",
-      phone: data.phone || "",
-      address: data.address || "",
-      category: data.category || "",
-      current_status: data.current_status || "",
-      quantity: data.quantity || "",
-      amount: data.amount || "",
-      remarks: data.remarks || "",
-      notes: data.notes || "",
-      age: data.age || "",
-      district: data.district || "",
-      amount_sanctioned: data.amount_sanctioned || "",
-      photo_url: data.photo_url || "",
+  const [form, setForm] =
+    useState({
+      ben_no: "",
+      full_name: "",
+      parentage: "",
+      phone: "",
+      address: "",
+      category: "",
+      current_status: "",
+      quantity: "",
+      amount: "",
+      remarks: "",
+      notes: "",
+      age: "",
+      district: "",
+      amount_sanctioned:
+        "",
+      photo_url: "",
     });
 
-    if (data.photo_url) {
-      const path = data.photo_url.split(
-        "/object/public/beneficiary-photos/"
-      )[1];
-      setOldPhotoPath(path);
-    }
+  const categories = [
+    "Sheep",
+    "Cow",
+    "Medical",
+    "Education",
+    "Livelihood Generation",
+    "Monthly Assistance",
+    "Monthly Handholding",
+    "Soft Loan",
+    "Other",
+  ];
 
-    setLoading(false);
-  };
+  const statuses = [
+    "New",
+    "Beneficiary Created",
+    "Verified",
+    "Closed",
+  ];
 
   useEffect(() => {
     loadBeneficiary();
   }, [id]);
 
-  const handleChange = (e: any) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
-  };
+  const loadBeneficiary =
+    async () => {
+      const {
+        data,
+        error,
+      } = await supabase
+        .from(
+          "beneficiaries"
+        )
+        .select("*")
+        .eq("id", id)
+        .single();
 
-  /** Save Changes */
-  const handleSubmit = async (e: any) => {
-    e.preventDefault();
-    setLoading(true);
-
-    let photo_url = form.photo_url;
-
-    try {
-      /** Photo replacement logic */
-      if (photoFile) {
-        if (oldPhotoPath) {
-          await supabase.storage
-            .from("beneficiary-photos")
-            .remove([oldPhotoPath]);
-        }
-
-        const ext = photoFile.name.split(".").pop();
-        const newPath = `ben_${form.ben_no}_${Date.now()}.${ext}`;
-
-        const { error: uploadError } = await supabase.storage
-          .from("beneficiary-photos")
-          .upload(newPath, photoFile);
-
-        if (uploadError) {
-          alert("Photo upload failed!");
-          setLoading(false);
-          return;
-        }
-
-        const { data: publicURL } = supabase.storage
-          .from("beneficiary-photos")
-          .getPublicUrl(newPath);
-
-        photo_url = publicURL.publicUrl;
-      }
-
-      /**  FIX: convert empty "" → null | convert numbers */
-      const payload = {
-        full_name: form.full_name,
-        parentage: form.parentage,
-        phone: form.phone,
-        address: form.address,
-        category: form.category,
-        current_status: form.current_status,
-        quantity: form.quantity ? Number(form.quantity) : null,
-        amount: form.amount ? Number(form.amount) : null,
-        age: form.age ? Number(form.age) : null,
-        amount_sanctioned: form.amount_sanctioned
-          ? Number(form.amount_sanctioned)
-          : null,
-        remarks: form.remarks,
-        notes: form.notes,
-        district: form.district,
-        photo_url,
-        updated_at: new Date(),
-      };
-
-      const { error } = await supabase
-        .from("beneficiaries")
-        .update(payload)
-        .eq("id", id);
-
-      if (error) {
-        console.log(error);
-        alert("Failed to update beneficiary");
-        setLoading(false);
+      if (
+        error ||
+        !data
+      ) {
+        alert(
+          "Beneficiary not found"
+        );
+        navigate(
+          "/beneficiaries"
+        );
         return;
       }
 
-      alert("Beneficiary updated successfully!");
-      navigate("/beneficiaries");
-    } catch (err) {
-      console.log(err);
-      alert("Something went wrong!");
-    }
+      setForm({
+        ben_no:
+          data.ben_no ||
+          "",
+        full_name:
+          data.full_name ||
+          "",
+        parentage:
+          data.parentage ||
+          "",
+        phone:
+          data.phone ||
+          "",
+        address:
+          data.address ||
+          "",
+        category:
+          data.category ||
+          "",
+        current_status:
+          data.current_status ||
+          "",
+        quantity:
+          data.quantity?.toString() ||
+          "",
+        amount:
+          data.amount?.toString() ||
+          "",
+        remarks:
+          data.remarks ||
+          "",
+        notes:
+          data.notes ||
+          "",
+        age:
+          data.age?.toString() ||
+          "",
+        district:
+          data.district ||
+          "",
+        amount_sanctioned:
+          data.amount_sanctioned?.toString() ||
+          "",
+        photo_url:
+          data.photo_url ||
+          "",
+      });
 
-    setLoading(false);
+      if (
+        data.photo_url
+      ) {
+        const path =
+          data.photo_url.split(
+            "/object/public/beneficiary-photos/"
+          )[1];
+
+        setOldPhotoPath(
+          path
+        );
+      }
+
+      setLoading(false);
+    };
+
+  const handleChange = (
+    e: React.ChangeEvent<
+      HTMLInputElement |
+        HTMLSelectElement |
+        HTMLTextAreaElement
+    >
+  ) => {
+    setForm({
+      ...form,
+      [e.target.name]:
+        e.target.value,
+    });
   };
 
-  if (loading) return <p className="p-6">Loading...</p>;
+  const numOrNull = (
+    val: string
+  ) =>
+    val === ""
+      ? null
+      : Number(val);
+
+  const handleSubmit =
+    async (
+      e: React.FormEvent
+    ) => {
+      e.preventDefault();
+      setLoading(true);
+
+      try {
+        let photo_url =
+          form.photo_url;
+
+        if (
+          photoFile
+        ) {
+          if (
+            oldPhotoPath
+          ) {
+            await supabase.storage
+              .from(
+                "beneficiary-photos"
+              )
+              .remove([
+                oldPhotoPath,
+              ]);
+          }
+
+          const ext =
+            photoFile.name
+              .split(".")
+              .pop();
+
+          const path = `ben_${form.ben_no}_${Date.now()}.${ext}`;
+
+          const {
+            error:
+              uploadError,
+          } =
+            await supabase.storage
+              .from(
+                "beneficiary-photos"
+              )
+              .upload(
+                path,
+                photoFile
+              );
+
+          if (
+            uploadError
+          ) {
+            alert(
+              "Photo upload failed"
+            );
+            setLoading(
+              false
+            );
+            return;
+          }
+
+          const {
+            data,
+          } =
+            supabase.storage
+              .from(
+                "beneficiary-photos"
+              )
+              .getPublicUrl(
+                path
+              );
+
+          photo_url =
+            data.publicUrl;
+        }
+
+        const {
+          error,
+        } =
+          await supabase
+            .from(
+              "beneficiaries"
+            )
+            .update({
+              full_name:
+                form.full_name,
+              parentage:
+                form.parentage,
+              phone:
+                form.phone,
+              address:
+                form.address,
+              category:
+                form.category,
+              current_status:
+                form.current_status,
+              quantity:
+                numOrNull(
+                  form.quantity
+                ),
+              amount:
+                numOrNull(
+                  form.amount
+                ),
+              age: numOrNull(
+                form.age
+              ),
+              amount_sanctioned:
+                numOrNull(
+                  form.amount_sanctioned
+                ),
+              remarks:
+                form.remarks,
+              notes:
+                form.notes,
+              district:
+                form.district,
+              photo_url,
+              updated_at:
+                new Date(),
+            })
+            .eq("id", id);
+
+        if (error) {
+          alert(
+            "Failed to update beneficiary"
+          );
+          setLoading(
+            false
+          );
+          return;
+        }
+
+        navigate(
+          "/beneficiaries"
+        );
+      } catch {
+        alert(
+          "Something went wrong"
+        );
+      }
+
+      setLoading(false);
+    };
+
+  if (loading) {
+    return (
+      <div className="p-6 text-center text-lg font-semibold">
+        Loading...
+      </div>
+    );
+  }
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
-      <h1 className="text-3xl font-bold text-blue-600 mb-6 text-center">
-        Edit Beneficiary — #{form.ben_no}
-      </h1>
+    <div className="p-3 md:p-6 max-w-5xl mx-auto">
+      {/* Header */}
+      <div className="mb-6">
+        <h1 className="text-2xl md:text-3xl font-bold text-slate-800">
+          Edit Beneficiary
+        </h1>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        
-        {/* Full Name + Parentage */}
-        <div className="grid grid-cols-2 gap-4">
-          <input
-            name="full_name"
-            placeholder="Full Name"
-            value={form.full_name}
-            onChange={handleChange}
-            className="border p-2 rounded"
-          />
+        <p className="text-sm text-slate-500 mt-1">
+          Beneficiary #
+          {form.ben_no}
+        </p>
+      </div>
 
-          <input
-            name="parentage"
-            placeholder="Parentage"
-            value={form.parentage}
-            onChange={handleChange}
-            className="border p-2 rounded"
-          />
-        </div>
+      <form
+        onSubmit={
+          handleSubmit
+        }
+        className="bg-white rounded-2xl shadow p-4 md:p-8 space-y-8"
+      >
+        {/* Basic */}
+        <section>
+          <h2 className="text-lg font-semibold mb-4">
+            Basic Details
+          </h2>
 
-        {/* Phone + Age */}
-        <div className="grid grid-cols-2 gap-4">
-          <input
-            name="phone"
-            placeholder="Phone Number"
-            value={form.phone}
-            onChange={handleChange}
-            className="border p-2 rounded"
-          />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Input
+              label="Full Name"
+              name="full_name"
+              value={
+                form.full_name
+              }
+              onChange={
+                handleChange
+              }
+            />
 
-          <input
-            name="age"
-            placeholder="Age"
-            value={form.age}
-            onChange={handleChange}
-            className="border p-2 rounded"
-          />
-        </div>
+            <Input
+              label="Parentage"
+              name="parentage"
+              value={
+                form.parentage
+              }
+              onChange={
+                handleChange
+              }
+            />
 
-        {/* Address + District */}
-        <div className="grid grid-cols-2 gap-4">
-          <input
-            name="address"
-            placeholder="Address"
-            value={form.address}
-            onChange={handleChange}
-            className="border p-2 rounded"
-          />
+            <Input
+              label="Phone"
+              name="phone"
+              value={
+                form.phone
+              }
+              onChange={
+                handleChange
+              }
+            />
 
-          <input
-            name="district"
-            placeholder="District"
-            value={form.district}
-            onChange={handleChange}
-            className="border p-2 rounded"
-          />
-        </div>
+            <Input
+              label="Age"
+              name="age"
+              type="number"
+              value={
+                form.age
+              }
+              onChange={
+                handleChange
+              }
+            />
 
-        {/* Category + Status */}
-        <div className="grid grid-cols-2 gap-4">
-          <select
-            name="category"
-            value={form.category}
-            onChange={handleChange}
-            className="border p-2 rounded"
-          >
-            <option value="">Category</option>
-            <option value="Sheep Unit">Sheep Unit</option>
-            <option value="Cow">Cow</option>
-            <option value="Medical">Medical</option>
-            <option value="Education">Education</option>
-            <option value="Livelihood Generation">Livelihood Generation</option>
-            <option value="Monthly Assistance">Monthly Assistance</option>
-            <option value="Food Kit">Food Kit</option>
-            <option value="Other">Other</option>
-          </select>
+            <Input
+              label="District"
+              name="district"
+              value={
+                form.district
+              }
+              onChange={
+                handleChange
+              }
+            />
 
-          <select
-            name="current_status"
-            value={form.current_status}
-            onChange={handleChange}
-            className="border p-2 rounded"
-          >
-            <option value="New">New</option>
-            <option value="15 sheeps">15 Sheeps</option>
-            <option value="Beneficiary Created">Beneficiary Created</option>
-            <option value="Verified">Verified</option>
-            <option value="Closed">Closed</option>
-          </select>
-        </div>
+            <Select
+              label="Category"
+              name="category"
+              value={
+                form.category
+              }
+              onChange={
+                handleChange
+              }
+              options={
+                categories
+              }
+            />
+          </div>
 
-        {/* Quantity + Amount */}
-        <div className="grid grid-cols-2 gap-4">
-          <input
-            name="quantity"
-            placeholder="Quantity"
-            value={form.quantity}
-            onChange={handleChange}
-            className="border p-2 rounded"
-          />
+          <div className="mt-4">
+            <TextArea
+              label="Address"
+              name="address"
+              value={
+                form.address
+              }
+              onChange={
+                handleChange
+              }
+              rows={3}
+            />
+          </div>
+        </section>
 
-          <input
-            name="amount"
-            placeholder="Amount"
-            value={form.amount}
-            onChange={handleChange}
-            className="border p-2 rounded"
-          />
-        </div>
+        {/* Support */}
+        <section>
+          <h2 className="text-lg font-semibold mb-4">
+            Support Details
+          </h2>
 
-        {/* Amount Sanctioned */}
-        <input
-          name="amount_sanctioned"
-          placeholder="Amount Sanctioned"
-          value={form.amount_sanctioned}
-          onChange={handleChange}
-          className="border p-2 rounded w-full"
-        />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Select
+              label="Status"
+              name="current_status"
+              value={
+                form.current_status
+              }
+              onChange={
+                handleChange
+              }
+              options={
+                statuses
+              }
+            />
 
-        {/* Remarks + Notes */}
-        <textarea
-          name="remarks"
-          placeholder="Remarks"
-          value={form.remarks}
-          onChange={handleChange}
-          className="border p-2 rounded w-full"
-        />
+            <Input
+              label="Quantity"
+              name="quantity"
+              value={
+                form.quantity
+              }
+              onChange={
+                handleChange
+              }
+            />
 
-        <textarea
-          name="notes"
-          placeholder="Notes"
-          value={form.notes}
-          onChange={handleChange}
-          className="border p-2 rounded w-full"
-        />
+            <Input
+              label="Amount"
+              name="amount"
+              type="number"
+              value={
+                form.amount
+              }
+              onChange={
+                handleChange
+              }
+            />
+
+            <Input
+              label="Amount Sanctioned"
+              name="amount_sanctioned"
+              type="number"
+              value={
+                form.amount_sanctioned
+              }
+              onChange={
+                handleChange
+              }
+            />
+          </div>
+        </section>
+
+        {/* Notes */}
+        <section>
+          <h2 className="text-lg font-semibold mb-4">
+            Notes
+          </h2>
+
+          <div className="space-y-4">
+            <TextArea
+              label="Remarks"
+              name="remarks"
+              value={
+                form.remarks
+              }
+              onChange={
+                handleChange
+              }
+              rows={3}
+            />
+
+            <TextArea
+              label="Notes"
+              name="notes"
+              value={
+                form.notes
+              }
+              onChange={
+                handleChange
+              }
+              rows={3}
+            />
+          </div>
+        </section>
 
         {/* Photo */}
-        <p className="font-semibold">Current Photo:</p>
-        {form.photo_url && (
-          <img
-            src={form.photo_url}
-            className="w-32 h-40 object-cover border rounded mb-3"
+        <section>
+          <h2 className="text-lg font-semibold mb-4">
+            Photo
+          </h2>
+
+          {form.photo_url && (
+            <img
+              src={
+                form.photo_url
+              }
+              alt="Beneficiary"
+              className="w-28 h-36 object-cover rounded-xl border mb-4"
+            />
+          )}
+
+          <input
+            type="file"
+            onChange={(e) =>
+              setPhotoFile(
+                e.target
+                  .files?.[0] ||
+                  null
+              )
+            }
+            className="w-full rounded-xl border px-4 py-3"
           />
-        )}
+        </section>
 
-        <input
-          type="file"
-          onChange={(e) => setPhotoFile(e.target.files?.[0] || null)}
-          className="border p-2 rounded w-full"
-        />
+        {/* Buttons */}
+        <div className="flex flex-col-reverse md:flex-row gap-3">
+          <button
+            type="button"
+            onClick={() =>
+              navigate(
+                "/beneficiaries"
+              )
+            }
+            className="w-full md:w-auto px-5 py-3 rounded-xl border hover:bg-slate-50"
+          >
+            Cancel
+          </button>
 
-        <button className="bg-blue-600 text-white p-3 rounded w-full">
-          Save Changes
-        </button>
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full md:w-auto px-6 py-3 rounded-xl bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60"
+          >
+            Save Changes
+          </button>
+        </div>
       </form>
+    </div>
+  );
+}
+
+/* Reusable */
+
+function Input(
+  props: any
+) {
+  return (
+    <div>
+      <label className="block text-sm font-medium mb-2">
+        {props.label}
+      </label>
+
+      <input
+        {...props}
+        className="w-full rounded-xl border px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500"
+      />
+    </div>
+  );
+}
+
+function Select(
+  props: any
+) {
+  return (
+    <div>
+      <label className="block text-sm font-medium mb-2">
+        {props.label}
+      </label>
+
+      <select
+        name={
+          props.name
+        }
+        value={
+          props.value
+        }
+        onChange={
+          props.onChange
+        }
+        className="w-full rounded-xl border px-4 py-3"
+      >
+        <option value="">
+          Select
+        </option>
+
+        {props.options.map(
+          (
+            item: string
+          ) => (
+            <option
+              key={item}
+              value={item}
+            >
+              {item}
+            </option>
+          )
+        )}
+      </select>
+    </div>
+  );
+}
+
+function TextArea(
+  props: any
+) {
+  return (
+    <div>
+      <label className="block text-sm font-medium mb-2">
+        {props.label}
+      </label>
+
+      <textarea
+        {...props}
+        className="w-full rounded-xl border px-4 py-3 resize-none outline-none focus:ring-2 focus:ring-blue-500"
+      />
     </div>
   );
 }

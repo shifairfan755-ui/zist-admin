@@ -18,7 +18,7 @@ import Applications from "./pages/Applications";
 import NewApplication from "./pages/NewApplication";
 import ViewApplication from "./pages/ViewApplication";
 import EditApplication from "./pages/EditApplication";
-
+import PaymentReceipt from "./pages/PaymentReceipt";
 /* ================= BENEFICIARIES ================= */
 import Beneficiaries from "./pages/Beneficiaries";
 import AddBeneficiary from "./pages/AddBeneficiary";
@@ -100,7 +100,7 @@ export default function App() {
         {/* ================= GENERAL (ALL AUTH USERS) ================= */}
         <Route path="applications" element={<Applications />} />
         <Route path="applications/view/:id" element={<ViewApplication />} />
-
+        <Route path="/payments/receipt/:id" element={<PaymentReceipt />} />
         <Route path="success-stories" element={<SuccessStories />} />
         <Route path="success-stories/view/:id" element={<ViewStory />} />
 

@@ -1,211 +1,565 @@
-import { useEffect, useState } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
+import {
+  useEffect,
+  useState,
+} from "react";
+
+import {
+  useParams,
+  Link,
+  useNavigate,
+} from "react-router-dom";
+
 import { supabase } from "../../lib/supabaseClient";
 import { toast } from "react-hot-toast";
 import { generateLoanPDF } from "./LoanPDF";
 
 export default function ViewSoftLoan() {
-  const { id } = useParams();
-  const navigate = useNavigate();
+  const { id } =
+    useParams();
 
-  const [loan, setLoan] = useState<any>(null);
-  const [installments, setInstallments] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const navigate =
+    useNavigate();
 
-  // ------------------------------
-  // LOAD MAIN LOAN
-  // ------------------------------
-  const loadLoan = async () => {
-    const { data, error } = await supabase
-      .from("soft_loans")
-      .select("*")
-      .eq("id", id)
-      .single();
+  const [loan, setLoan] =
+    useState<any>(null);
 
-    if (error || !data) {
-      toast.error("Loan not found");
-      navigate("/soft-loans");
-      return;
-    }
+  const [
+    installments,
+    setInstallments,
+  ] = useState<any[]>([]);
 
-    setLoan(data);
-  };
-
-  // ------------------------------
-  // LOAD INSTALLMENTS
-  // ------------------------------
-  const loadInstallments = async () => {
-    const { data } = await supabase
-      .from("soft_loan_installments")
-      .select("*")
-      .eq("loan_id", id)
-      .order("date", { ascending: false });
-
-    setInstallments(data || []);
-  };
+  const [loading, setLoading] =
+    useState(true);
 
   useEffect(() => {
-    Promise.all([loadLoan(), loadInstallments()]).then(() =>
-      setLoading(false)
-    );
+    loadData();
   }, [id]);
 
-  const deleteLoan = async () => {
-    const yes = confirm("Are you sure you want to delete this loan?");
-    if (!yes) return;
+  const loadData =
+    async () => {
+      setLoading(true);
 
-    const { error } = await supabase
-      .from("soft_loans")
-      .delete()
-      .eq("id", id);
+      await Promise.all([
+        loadLoan(),
+        loadInstallments(),
+      ]);
 
-    if (error) return toast.error("Failed to delete soft loan");
+      setLoading(false);
+    };
 
-    toast.success("Loan deleted successfully");
-    navigate("/soft-loans");
-  };
+  const loadLoan =
+    async () => {
+      const {
+        data,
+        error,
+      } =
+        await supabase
+          .from(
+            "soft_loans"
+          )
+          .select("*")
+          .eq("id", id)
+          .single();
 
-  if (loading) return <p className="p-6">Loading...</p>;
-  if (!loan) return <p className="p-6 text-red-600">Loan not found</p>;
+      if (
+        error ||
+        !data
+      ) {
+        toast.error(
+          "Loan not found"
+        );
 
-  const totalPaid = installments.reduce(
-    (total, i) => total + Number(i.amount || 0),
-    0
-  );
+        navigate(
+          "/soft-loans"
+        );
 
-  const remaining = Number(loan.amount) - totalPaid;
+        return;
+      }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "Paid on Time":
-        return "bg-green-100 text-green-700";
-      case "Defaulter":
-        return "bg-red-100 text-red-700";
-      case "Paying in Installments":
-        return "bg-yellow-100 text-yellow-700";
-      case "Closed as Imdaad":
-        return "bg-blue-100 text-blue-700";
-      default:
-        return "bg-gray-100 text-gray-700";
-    }
-  };
+      setLoan(data);
+    };
+
+  const loadInstallments =
+    async () => {
+      const {
+        data,
+      } =
+        await supabase
+          .from(
+            "soft_loan_installments"
+          )
+          .select("*")
+          .eq(
+            "loan_id",
+            id
+          )
+          .order("date", {
+            ascending:
+              false,
+          });
+
+      setInstallments(
+        data || []
+      );
+    };
+
+  const deleteLoan =
+    async () => {
+      const yes =
+        confirm(
+          "Delete this loan permanently?"
+        );
+
+      if (!yes) return;
+
+      const {
+        error,
+      } =
+        await supabase
+          .from(
+            "soft_loans"
+          )
+          .delete()
+          .eq("id", id);
+
+      if (error) {
+        toast.error(
+          "Delete failed"
+        );
+        return;
+      }
+
+      toast.success(
+        "Loan deleted"
+      );
+
+      navigate(
+        "/soft-loans"
+      );
+    };
+
+  if (loading) {
+    return (
+      <div className="p-6 text-center font-semibold">
+        Loading...
+      </div>
+    );
+  }
+
+  if (!loan) {
+    return (
+      <div className="p-6 text-red-600">
+        Loan not found
+      </div>
+    );
+  }
+
+  const totalPaid =
+    installments.reduce(
+      (
+        total,
+        item
+      ) =>
+        total +
+        Number(
+          item.amount ||
+            0
+        ),
+      0
+    );
+
+  const remaining =
+    Number(
+      loan.amount ||
+        0
+    ) - totalPaid;
+
+  const percentPaid =
+    Number(
+      loan.amount
+    ) > 0
+      ? Math.min(
+          100,
+          Math.round(
+            (totalPaid /
+              Number(
+                loan.amount
+              )) *
+              100
+          )
+        )
+      : 0;
+
+  const badgeColor =
+    (
+      status: string
+    ) => {
+      switch (
+        status
+      ) {
+        case "Paid on Time":
+          return "bg-green-100 text-green-700";
+
+        case "Defaulter":
+          return "bg-red-100 text-red-700";
+
+        case "Paying in Installments":
+          return "bg-yellow-100 text-yellow-700";
+
+        case "Closed as Imdaad":
+          return "bg-blue-100 text-blue-700";
+
+        default:
+          return "bg-slate-100 text-slate-700";
+      }
+    };
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
-
-      <Link to="/soft-loans" className="text-blue-600">
-        ← Back to Soft Loans
+    <div className="p-3 md:p-6 max-w-6xl mx-auto">
+      {/* Back */}
+      <Link
+        to="/soft-loans"
+        className="text-blue-600 text-sm font-medium"
+      >
+        ← Back to
+        Soft Loans
       </Link>
 
-      <h1 className="text-3xl font-bold text-green-700 mt-4 mb-6">
-        Soft Loan Details
-      </h1>
+      {/* Title */}
+      <div className="mt-4 mb-6">
+        <h1 className="text-2xl md:text-3xl font-bold text-slate-800">
+          Soft Loan
+          Details
+        </h1>
 
-      <div className="bg-white rounded-2xl shadow-lg p-8 border">
+        <p className="text-sm text-slate-500 mt-1">
+          Complete loan
+          profile and
+          repayment
+          history
+        </p>
+      </div>
 
-        {/* HEADER */}
-        <div className="flex justify-between items-start border-b pb-5 mb-6">
-          <div>
-            <h2 className="text-2xl font-bold">{loan.name}</h2>
-            {loan.parentage && (
-              <p className="text-gray-600 mt-1">S/O: {loan.parentage}</p>
-            )}
-            <p className="text-gray-600">{loan.phone}</p>
-            <p className="text-gray-500">{loan.address}</p>
+      {/* Top Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Borrower */}
+        <div className="lg:col-span-2 bg-white rounded-2xl shadow p-5 md:p-6">
+          <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+            <div>
+              <h2 className="text-2xl font-bold text-slate-800">
+                {
+                  loan.name
+                }
+              </h2>
+
+              {loan.parentage && (
+                <p className="text-slate-500 mt-1">
+                  S/O{" "}
+                  {
+                    loan.parentage
+                  }
+                </p>
+              )}
+
+              {loan.phone && (
+                <p className="text-slate-600 mt-2">
+                  📞{" "}
+                  {
+                    loan.phone
+                  }
+                </p>
+              )}
+
+              {loan.address && (
+                <p className="text-slate-600 mt-1">
+                  📍{" "}
+                  {
+                    loan.address
+                  }
+                </p>
+              )}
+            </div>
 
             <span
-              className={`inline-block mt-3 px-3 py-1 text-sm rounded-full font-semibold ${getStatusColor(
+              className={`px-3 py-2 rounded-full text-sm font-semibold w-fit ${badgeColor(
                 loan.status
               )}`}
             >
-              {loan.status}
+              {
+                loan.status
+              }
             </span>
           </div>
 
-          <div className="text-right">
-            <h2 className="text-3xl font-bold text-green-700">
-              ₹{loan.amount?.toLocaleString()}
-            </h2>
-            <p className="text-gray-500 text-sm mt-1">
-              Loan Date: {new Date(loan.loan_date).toLocaleDateString()}
-            </p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-6">
+            <StatCard
+              label="Loan Amount"
+              value={`₹${Number(
+                loan.amount
+              ).toLocaleString()}`}
+            />
+
+            <StatCard
+              label="Recovered"
+              value={`₹${totalPaid.toLocaleString()}`}
+            />
+
+            <StatCard
+              label="Balance"
+              value={`₹${remaining.toLocaleString()}`}
+            />
+
+            <StatCard
+              label="Date"
+              value={new Date(
+                loan.loan_date
+              ).toLocaleDateString()}
+            />
+          </div>
+
+          {/* Progress */}
+          <div className="mt-6">
+            <div className="flex justify-between text-sm mb-2">
+              <span className="font-medium">
+                Recovery
+                Progress
+              </span>
+
+              <span>
+                {
+                  percentPaid
+                }
+                %
+              </span>
+            </div>
+
+            <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-green-600"
+                style={{
+                  width: `${percentPaid}%`,
+                }}
+              />
+            </div>
+          </div>
+
+          {loan.recommendation && (
+            <div className="mt-6 text-sm text-slate-600">
+              <span className="font-semibold">
+                Recommended
+                By:
+              </span>{" "}
+              {
+                loan.recommendation
+              }
+            </div>
+          )}
+
+          {loan.notes && (
+            <div className="mt-3 text-sm text-slate-600">
+              <span className="font-semibold">
+                Notes:
+              </span>{" "}
+              {
+                loan.notes
+              }
+            </div>
+          )}
+        </div>
+
+        {/* Actions */}
+        <div className="bg-white rounded-2xl shadow p-5 md:p-6">
+          <h3 className="font-semibold text-lg mb-4">
+            Quick Actions
+          </h3>
+
+          <div className="space-y-3">
+            <Link
+              to={`/soft-loans/edit/${loan.id}`}
+              className="block text-center w-full px-4 py-3 rounded-xl bg-blue-600 text-white hover:bg-blue-700"
+            >
+              Edit Loan
+            </Link>
+
+            <Link
+              to={`/soft-loans/installment/add/${loan.id}`}
+              className="block text-center w-full px-4 py-3 rounded-xl bg-green-600 text-white hover:bg-green-700"
+            >
+              + Add Installment
+            </Link>
+
+            <button
+              onClick={() =>
+                generateLoanPDF(
+                  loan,
+                  installments
+                )
+              }
+              className="w-full px-4 py-3 rounded-xl bg-purple-600 text-white hover:bg-purple-700"
+            >
+              Download PDF
+            </button>
+
+            <button
+              onClick={
+                deleteLoan
+              }
+              className="w-full px-4 py-3 rounded-xl bg-red-600 text-white hover:bg-red-700"
+            >
+              Delete Loan
+            </button>
           </div>
         </div>
+      </div>
 
-        {/* INSTALLMENT HEADER */}
-        <div className="flex justify-between items-center mt-10 mb-4">
-          <h2 className="text-xl font-bold">Installment History</h2>
+      {/* Installments */}
+      <div className="mt-6 bg-white rounded-2xl shadow p-4 md:p-6">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-bold">
+            Installment
+            History
+          </h2>
 
-          {/* ✅ FIXED ROUTE */}
-          <Link
-            to={`/soft-loans/installment/add/${loan.id}`}
-            className="bg-green-700 text-white px-4 py-2 rounded-lg shadow hover:bg-green-800"
-          >
-            + Add Installment
-          </Link>
+          <span className="text-sm text-slate-500">
+            {
+              installments.length
+            }{" "}
+            records
+          </span>
         </div>
 
-        {/* INSTALLMENTS TABLE */}
-        <div className="bg-gray-50 rounded-xl border shadow-sm overflow-hidden">
-          <table className="w-full border-collapse text-sm">
-            <thead className="bg-green-100">
+        {/* Desktop */}
+        <div className="hidden md:block overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-slate-100 text-slate-600">
               <tr>
-                <th className="p-3 border">Date</th>
-                <th className="p-3 border">Amount</th>
-                <th className="p-3 border">Notes</th>
+                <th className="p-3 text-left">
+                  Date
+                </th>
+                <th className="p-3 text-left">
+                  Amount
+                </th>
+                <th className="p-3 text-left">
+                  Notes
+                </th>
               </tr>
             </thead>
 
             <tbody>
-              {installments.length === 0 ? (
+              {installments.length ===
+              0 ? (
                 <tr>
-                  <td className="p-4 text-center text-gray-500" colSpan={3}>
-                    No installments recorded
+                  <td
+                    colSpan={
+                      3
+                    }
+                    className="p-6 text-center text-slate-500"
+                  >
+                    No
+                    installments
+                    yet
                   </td>
                 </tr>
               ) : (
-                installments.map((ins) => (
-                  <tr key={ins.id}>
-                    <td className="p-3 border">
-                      {new Date(ins.date).toLocaleDateString()}
-                    </td>
-                    <td className="p-3 border text-green-700 font-bold">
-                      ₹{ins.amount?.toLocaleString()}
-                    </td>
-                    <td className="p-3 border">{ins.notes || "—"}</td>
-                  </tr>
-                ))
+                installments.map(
+                  (
+                    item
+                  ) => (
+                    <tr
+                      key={
+                        item.id
+                      }
+                      className="border-t"
+                    >
+                      <td className="p-3">
+                        {new Date(
+                          item.date
+                        ).toLocaleDateString()}
+                      </td>
+
+                      <td className="p-3 font-semibold text-green-700">
+                        ₹
+                        {Number(
+                          item.amount
+                        ).toLocaleString()}
+                      </td>
+
+                      <td className="p-3">
+                        {item.notes ||
+                          "—"}
+                      </td>
+                    </tr>
+                  )
+                )
               )}
             </tbody>
           </table>
         </div>
 
-        {/* ACTION BUTTONS */}
-        <div className="mt-10 flex gap-4">
+        {/* Mobile Cards */}
+        <div className="md:hidden space-y-3">
+          {installments.length ===
+          0 ? (
+            <div className="text-center text-slate-500 py-4">
+              No
+              installments
+              yet
+            </div>
+          ) : (
+            installments.map(
+              (
+                item
+              ) => (
+                <div
+                  key={
+                    item.id
+                  }
+                  className="border rounded-xl p-4"
+                >
+                  <div className="flex justify-between items-center">
+                    <p className="font-semibold">
+                      ₹
+                      {Number(
+                        item.amount
+                      ).toLocaleString()}
+                    </p>
 
-          {/* ✅ FIXED ROUTE */}
-          <Link
-            to={`/soft-loans/edit/${loan.id}`}
-            className="bg-blue-600 text-white px-5 py-2.5 rounded-lg shadow hover:bg-blue-700"
-          >
-            Edit Loan
-          </Link>
+                    <p className="text-sm text-slate-500">
+                      {new Date(
+                        item.date
+                      ).toLocaleDateString()}
+                    </p>
+                  </div>
 
-          <button
-            onClick={deleteLoan}
-            className="bg-red-600 text-white px-5 py-2.5 rounded-lg shadow hover:bg-red-700"
-          >
-            Delete Loan
-          </button>
-
-          <button
-            onClick={() => generateLoanPDF(loan, installments)}
-            className="bg-purple-600 text-white px-5 py-2.5 rounded-lg shadow hover:bg-purple-700"
-          >
-            Download PDF
-          </button>
+                  <p className="text-sm text-slate-600 mt-2">
+                    {item.notes ||
+                      "No notes"}
+                  </p>
+                </div>
+              )
+            )
+          )}
         </div>
       </div>
+    </div>
+  );
+}
+
+/* Reusable */
+
+function StatCard({
+  label,
+  value,
+}: any) {
+  return (
+    <div className="rounded-xl bg-slate-50 p-4">
+      <p className="text-xs text-slate-500">
+        {label}
+      </p>
+
+      <p className="font-bold text-slate-800 mt-1">
+        {value}
+      </p>
     </div>
   );
 }

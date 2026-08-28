@@ -1,76 +1,296 @@
 import { useEffect, useState } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
+import {
+  useParams,
+  Link,
+  useNavigate,
+} from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
 
 export default function ViewApplication() {
   const { id } = useParams();
   const navigate = useNavigate();
 
-  const [app, setApp] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const [app, setApp] =
+    useState<any>(null);
+
+  const [loading, setLoading] =
+    useState(true);
 
   useEffect(() => {
-    const load = async () => {
-      const { data } = await supabase
-        .from("applications")
+    loadApplication();
+  }, [id]);
+
+  const loadApplication =
+    async () => {
+      const {
+        data,
+        error,
+      } = await supabase
+        .from(
+          "applications"
+        )
         .select("*")
         .eq("id", id)
         .single();
+
+      if (
+        error ||
+        !data
+      ) {
+        setLoading(false);
+        return;
+      }
 
       setApp(data);
       setLoading(false);
     };
 
-    load();
-  }, [id]);
+  const deleteApplication =
+    async () => {
+      const yes =
+        confirm(
+          "Delete this application?"
+        );
 
-  const deleteApplication = async () => {
-    if (!confirm("Delete this application?")) return;
+      if (!yes)
+        return;
 
-    await supabase.from("applications").delete().eq("id", id);
-    navigate("/applications");
-  };
+      await supabase
+        .from(
+          "applications"
+        )
+        .delete()
+        .eq("id", id);
 
-  if (loading) return <p className="p-6">Loading...</p>;
-  if (!app) return <p className="p-6 text-red-600">Application Not Found</p>;
+      navigate(
+        "/applications"
+      );
+    };
+
+  if (loading) {
+    return (
+      <div className="p-6 text-center text-lg font-semibold">
+        Loading...
+      </div>
+    );
+  }
+
+  if (!app) {
+    return (
+      <div className="p-6 text-red-600">
+        Application not found
+      </div>
+    );
+  }
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
-
-      <Link to="/applications" className="text-blue-600">
-        ← Back to Applications
+    <div className="p-3 md:p-6 max-w-6xl mx-auto">
+      {/* Back */}
+      <Link
+        to="/applications"
+        className="text-blue-600 text-sm font-medium"
+      >
+        ← Back to
+        Applications
       </Link>
 
-      <h1 className="text-3xl font-bold mt-4 mb-6">
-        Application — {app.application_no}
-      </h1>
+      {/* Header */}
+      <div className="bg-white rounded-2xl shadow p-5 md:p-8 mt-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-5">
+          <div>
+            <p className="text-sm text-slate-500">
+              Application #
+              {
+                app.application_no
+              }
+            </p>
 
-      <div className="bg-white p-6 border rounded-xl space-y-3">
-        <p><b>Name:</b> {app.applicant_name}</p>
-        <p><b>Parentage:</b> {app.parentage}</p>
-        <p><b>Phone:</b> {app.phone}</p>
-        <p><b>Address:</b> {app.address}</p>
-        <p><b>Requested For:</b> {app.requested_for}</p>
-        <p><b>Amount:</b> ₹{app.amount_requested}</p>
-        <p><b>Status:</b> {app.status}</p>
+            <h1 className="text-2xl md:text-3xl font-bold text-slate-800 mt-1">
+              {
+                app.applicant_name
+              }
+            </h1>
+
+            <p className="text-slate-600 mt-1">
+              {app.parentage
+                ? `S/o ${app.parentage}`
+                : "---"}
+            </p>
+
+            <div className="flex flex-wrap gap-2 mt-4">
+              <Badge>
+                {
+                  app.requested_for
+                }
+              </Badge>
+
+              <Badge gray>
+                {app.status ||
+                  "Pending"}
+              </Badge>
+            </div>
+          </div>
+
+          {/* Buttons */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 w-full md:w-auto">
+            <Link
+              to={`/applications/edit/${app.id}`}
+              className="px-5 py-3 rounded-xl bg-blue-600 text-white text-center hover:bg-blue-700"
+            >
+              Edit
+            </Link>
+
+            <button
+              onClick={
+                deleteApplication
+              }
+              className="px-5 py-3 rounded-xl bg-red-600 text-white hover:bg-red-700"
+            >
+              Delete
+            </button>
+          </div>
+        </div>
       </div>
 
-      <div className="flex gap-4 mt-6">
-        <Link
-          to={`/applications/edit/${app.id}`}
-          className="bg-blue-600 text-white px-6 py-3 rounded-lg"
-        >
-          Edit Application
-        </Link>
+      {/* Details */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mt-6">
+        <Card title="Applicant Details">
+          <Row
+            label="Phone"
+            value={
+              app.phone
+            }
+          />
 
-        <button
-          onClick={deleteApplication}
-          className="bg-red-600 text-white px-6 py-3 rounded-lg"
-        >
-          Delete
-        </button>
+          <Row
+            label="Address"
+            value={
+              app.address
+            }
+          />
+
+          <Row
+            label="Date"
+            value={
+              app.application_date
+            }
+          />
+        </Card>
+
+        <Card title="Request Details">
+          <Row
+            label="Requested For"
+            value={
+              app.requested_for
+            }
+          />
+
+          <Row
+            label="Amount Requested"
+            value={
+              app.amount_requested
+                ? `₹${Number(
+                    app.amount_requested
+                  ).toLocaleString()}`
+                : "---"
+            }
+          />
+
+          <Row
+            label="Status"
+            value={
+              app.status
+            }
+          />
+        </Card>
       </div>
 
+      {/* Notes */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mt-5">
+        <Card title="Recommendation">
+          <p className="text-slate-700 whitespace-pre-line">
+            {app.recommendation ||
+              "---"}
+          </p>
+        </Card>
+
+        <Card title="Notes">
+          <p className="text-slate-700 whitespace-pre-line">
+            {app.notes ||
+              "---"}
+          </p>
+        </Card>
+      </div>
+
+      {/* Document */}
+      {app.document_url && (
+        <div className="mt-5">
+          <Card title="Supporting Document">
+            <a
+              href={
+                app.document_url
+              }
+              target="_blank"
+              rel="noreferrer"
+              className="text-blue-600 font-medium hover:underline"
+            >
+              Open Document
+            </a>
+          </Card>
+        </div>
+      )}
     </div>
+  );
+}
+
+/* Components */
+
+function Card({
+  title,
+  children,
+}: any) {
+  return (
+    <div className="bg-white rounded-2xl shadow p-5">
+      <h2 className="text-lg font-semibold text-slate-800 mb-4">
+        {title}
+      </h2>
+
+      {children}
+    </div>
+  );
+}
+
+function Row({
+  label,
+  value,
+}: any) {
+  return (
+    <div className="flex justify-between gap-4 border-b pb-3 mb-3 last:border-none last:pb-0 last:mb-0">
+      <span className="text-slate-500 text-sm">
+        {label}
+      </span>
+
+      <span className="font-medium text-slate-800 text-right">
+        {value ||
+          "---"}
+      </span>
+    </div>
+  );
+}
+
+function Badge({
+  children,
+  gray = false,
+}: any) {
+  return (
+    <span
+      className={`px-3 py-1 rounded-full text-xs font-medium ${
+        gray
+          ? "bg-slate-100 text-slate-700"
+          : "bg-blue-50 text-blue-700"
+      }`}
+    >
+      {children}
+    </span>
   );
 }

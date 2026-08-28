@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { supabase } from "../lib/supabaseClient";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "../lib/supabaseClient";
 
 export default function AddPayment() {
   const navigate = useNavigate();
@@ -9,134 +9,313 @@ export default function AddPayment() {
     payee_name: "",
     category: "",
     amount: "",
-    payment_date: "",
+    cheque_no: "", // ✅ added
+    payment_date: new Date()
+      .toISOString()
+      .slice(0, 10),
     notes: "",
     mode: "",
   });
 
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] =
+    useState(false);
 
-  const handleChange = (e: any) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+  const categories = [
+    "Sheep",
+    "Cow",
+    "Monthly Assistance",
+    "Education",
+    "Medical",
+    "Livelihood Generation",
+    "Soft Loan",
+    "Salary",
+    "Office Expense",
+    "Other",
+  ];
+
+  const paymentModes = [
+    "Cash",
+    "Bank Transfer",
+    "Cheque",
+    "UPI",
+  ];
+
+  const handleChange = (
+    e: React.ChangeEvent<
+      HTMLInputElement |
+        HTMLSelectElement |
+        HTMLTextAreaElement
+    >
+  ) => {
+    setForm({
+      ...form,
+      [e.target.name]:
+        e.target.value,
+    });
   };
 
-  const handleSubmit = async (e: any) => {
+  const handleSubmit = async (
+    e: React.FormEvent
+  ) => {
     e.preventDefault();
+
     setLoading(true);
 
-   const { error } = await supabase.from("payments").insert([
-  {
-    payee_name: form.payee_name,
-    category: form.category,
-    amount: Number(form.amount),
-    payment_date:
-      form.payment_date || new Date().toISOString().slice(0, 10),
-    notes: form.notes || null,
-  },
-]);
-
+    const { error } =
+      await supabase
+        .from("payments")
+        .insert([
+          {
+            payee_name:
+              form.payee_name,
+            category:
+              form.category,
+            amount: Number(
+              form.amount
+            ),
+            cheque_no:
+              form.cheque_no ||
+              null, // ✅ save
+            payment_date:
+              form.payment_date,
+            notes:
+              form.notes ||
+              null,
+            mode:
+              form.mode ||
+              null,
+          },
+        ]);
 
     if (error) {
-      alert("Error saving payment");
+      alert(
+        "Error saving payment"
+      );
       console.log(error);
       setLoading(false);
       return;
     }
 
-    setLoading(false);
     navigate("/payments");
   };
 
   return (
-    <div className="p-6 max-w-3xl mx-auto">
-      <h1 className="text-3xl font-bold text-blue-600 mb-6 text-center">
-        Add New Payment
-      </h1>
+    <div className="p-3 md:p-6 max-w-4xl mx-auto">
 
+      {/* Header */}
+      <div className="mb-6">
+        <h1 className="text-2xl md:text-3xl font-bold text-slate-800">
+          Add Payment
+        </h1>
+
+        <p className="text-sm text-slate-500 mt-1">
+          Record a new payment
+          or assistance entry
+        </p>
+      </div>
+
+      {/* Form */}
       <form
-        onSubmit={handleSubmit}
-        className="space-y-5 bg-white p-6 rounded-xl shadow"
+        onSubmit={
+          handleSubmit
+        }
+        className="bg-white rounded-2xl shadow p-4 md:p-8 space-y-6"
       >
+
         {/* Payee */}
-        <input
-          name="payee_name"
-          placeholder="Payee Name"
-          value={form.payee_name}
-          onChange={handleChange}
-          className="border p-3 rounded w-full"
-          required
-        />
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-2">
+            Payee Name
+          </label>
 
-        {/* Category */}
-        <select
-          name="category"
-          value={form.category}
-          onChange={handleChange}
-          className="border p-3 rounded w-full"
-          required
-        >
-          <option value="">Select Category</option>
-          <option value="Education">Education</option>
-          <option value="Medical">Medical</option>
-          <option value="Sheep Unit">Sheep Unit</option>
-          <option value="Livelihood Generation">Livelihood Generation</option>
-          <option value="Salary">Salary</option>
-          <option value="Office Expense">Office Expense</option>
-          <option value="Monthly Assistance">Monthly Assistance</option>
-          <option value="Soft Loan">Soft Loan</option>
-          <option value="Other">Other</option>
-        </select>
+          <input
+            type="text"
+            name="payee_name"
+            value={
+              form.payee_name
+            }
+            onChange={
+              handleChange
+            }
+            placeholder="Enter full name"
+            required
+            className="w-full rounded-xl border px-4 py-3"
+          />
+        </div>
 
-        {/* Amount */}
-        <input
-          type="number"
-          name="amount"
-          placeholder="Amount"
-          value={form.amount}
-          onChange={handleChange}
-          className="border p-3 rounded w-full"
-          required
-        />
+        {/* Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
 
-        {/* Mode */}
-        <select
-          name="mode"
-          value={form.mode}
-          onChange={handleChange}
-          className="border p-3 rounded w-full"
-        >
-          <option value="">Payment Mode</option>
-          <option value="Cash">Cash</option>
-          <option value="Bank Transfer">Bank Transfer</option>
-          <option value="Cheque">Cheque</option>
-          <option value="UPI">UPI</option>
-        </select>
+          {/* Category */}
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">
+              Category
+            </label>
 
-        {/* Date */}
-        <input
-          type="date"
-          name="payment_date"
-          value={form.payment_date}
-          onChange={handleChange}
-          className="border p-3 rounded w-full"
-        />
+            <select
+              name="category"
+              value={
+                form.category
+              }
+              onChange={
+                handleChange
+              }
+              required
+              className="w-full rounded-xl border px-4 py-3"
+            >
+              <option value="">
+                Select Category
+              </option>
+
+              {categories.map(
+                (item) => (
+                  <option
+                    key={item}
+                    value={item}
+                  >
+                    {item}
+                  </option>
+                )
+              )}
+            </select>
+          </div>
+
+          {/* Amount */}
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">
+              Amount
+            </label>
+
+            <input
+              type="number"
+              name="amount"
+              value={
+                form.amount
+              }
+              onChange={
+                handleChange
+              }
+              placeholder="0"
+              required
+              className="w-full rounded-xl border px-4 py-3"
+            />
+          </div>
+
+          {/* ✅ Cheque No */}
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">
+              Cheque No / Reference
+            </label>
+
+            <input
+              type="text"
+              name="cheque_no"
+              value={
+                form.cheque_no
+              }
+              onChange={
+                handleChange
+              }
+              placeholder="Enter cheque number"
+              className="w-full rounded-xl border px-4 py-3"
+            />
+          </div>
+
+          {/* Mode */}
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">
+              Payment Mode
+            </label>
+
+            <select
+              name="mode"
+              value={form.mode}
+              onChange={
+                handleChange
+              }
+              className="w-full rounded-xl border px-4 py-3"
+            >
+              <option value="">
+                Select Mode
+              </option>
+
+              {paymentModes.map(
+                (mode) => (
+                  <option
+                    key={mode}
+                    value={mode}
+                  >
+                    {mode}
+                  </option>
+                )
+              )}
+            </select>
+          </div>
+
+          {/* Date */}
+          <div className="md:col-span-2">
+            <label className="block text-sm font-medium text-slate-700 mb-2">
+              Payment Date
+            </label>
+
+            <input
+              type="date"
+              name="payment_date"
+              value={
+                form.payment_date
+              }
+              onChange={
+                handleChange
+              }
+              className="w-full rounded-xl border px-4 py-3"
+            />
+          </div>
+        </div>
 
         {/* Notes */}
-        <textarea
-          name="notes"
-          placeholder="Notes"
-          value={form.notes}
-          onChange={handleChange}
-          className="border p-3 rounded w-full"
-        />
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-2">
+            Notes
+          </label>
 
-        <button
-          type="submit"
-          disabled={loading}
-          className="bg-blue-600 text-white w-full p-3 rounded-lg hover:bg-blue-700"
-        >
-          {loading ? "Saving..." : "Add Payment"}
-        </button>
+          <textarea
+            name="notes"
+            rows={4}
+            value={form.notes}
+            onChange={
+              handleChange
+            }
+            placeholder="Optional notes..."
+            className="w-full rounded-xl border px-4 py-3 resize-none"
+          />
+        </div>
+
+        {/* Buttons */}
+        <div className="flex flex-col-reverse md:flex-row gap-3 pt-2">
+
+          <button
+            type="button"
+            onClick={() =>
+              navigate(
+                "/payments"
+              )
+            }
+            className="w-full md:w-auto px-5 py-3 rounded-xl border"
+          >
+            Cancel
+          </button>
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full md:w-auto px-6 py-3 rounded-xl bg-blue-600 text-white"
+          >
+            {loading
+              ? "Saving..."
+              : "Save Payment"}
+          </button>
+
+        </div>
       </form>
     </div>
   );

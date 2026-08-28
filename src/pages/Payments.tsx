@@ -2,9 +2,9 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
 
-// 🔹 Debounce function
 const debounce = (fn: Function, delay = 300) => {
   let timeout: any;
+
   return (...args: any[]) => {
     clearTimeout(timeout);
     timeout = setTimeout(() => fn(...args), delay);
@@ -36,19 +36,24 @@ export default function Payments() {
       .select("*")
       .order("payment_date", { ascending: false });
 
-    if (categoryFilter)
+    if (categoryFilter) {
       query = query.eq("category", categoryFilter);
-
-    if (debouncedSearch) {
-      query = query.or(
-        `payee_name.ilike.%${debouncedSearch}%,notes.ilike.%${debouncedSearch}%,description.ilike.%${debouncedSearch}%`
-      );
     }
 
-    const { data, error } = await query;
+    // ✅ SEARCH NOW INCLUDES CHEQUE NO + MODE
+    if (debouncedSearch) {
+      query = query.or(`
+        payee_name.ilike.%${debouncedSearch}%,
+        notes.ilike.%${debouncedSearch}%,
+        description.ilike.%${debouncedSearch}%,
+        cheque_no.ilike.%${debouncedSearch}%,
+        mode.ilike.%${debouncedSearch}%
+      `);
+    }
 
-    if (!error && data) setPayments(data);
+    const { data } = await query;
 
+    setPayments(data || []);
     setLoading(false);
   };
 
@@ -65,61 +70,86 @@ export default function Payments() {
   };
 
   const bulkDelete = async () => {
-    if (!selected.length) return alert("No items selected");
+    if (!selected.length) return;
+
     if (!confirm("Delete selected payments?")) return;
 
-    const { error } = await supabase
+    await supabase
       .from("payments")
       .delete()
       .in("id", selected);
 
-    if (!error) {
-      alert("Deleted successfully");
-      setSelected([]);
-      loadPayments();
-    }
+    setSelected([]);
+    loadPayments();
   };
 
-  const exportCSV = () => {
-    if (!payments.length) return;
+  const categories = [
+    "Sheep",
+    "Cow",
+    "Monthly Assistance",
+    "Education",
+    "Medical",
+    "Livelihood Generation",
+    "Soft Loan",
+    "Salary",
+    "Office Expense",
+    "Other",
+  ];
 
-    const header = Object.keys(payments[0]).join(",");
-    const rows = payments
-      .map((p) => Object.values(p).join(","))
-      .join("\n");
-
-    const csvContent =
-      "data:text/csv;charset=utf-8," + header + "\n" + rows;
-
-    const link = document.createElement("a");
-    link.href = encodeURI(csvContent);
-    link.download = "payments_export.csv";
-    link.click();
-  };
-
-  if (loading)
+  if (loading) {
     return (
-      <p className="p-6 text-center text-xl font-semibold">
+      <div className="p-6 text-center text-lg font-semibold">
         Loading Payments...
-      </p>
+      </div>
     );
+  }
 
   return (
-    <div className="p-6">
-      {/* Header */}
-      <div className="flex flex-wrap justify-between items-center mb-6 gap-4">
-        <h1 className="text-3xl font-bold text-blue-600">
-          Payments
-        </h1>
+    <div className="p-3 md:p-6">
 
-        {/* 🔍 Search + Filter */}
-        <div className="flex gap-3 items-center">
+      {/* HEADER */}
+      <div className="flex flex-col gap-4 mb-6">
+
+        <div className="flex flex-col md:flex-row md:justify-between gap-4">
+
+          <h1 className="text-3xl font-bold text-blue-600">
+            Payments
+          </h1>
+
+          <div className="flex gap-2 flex-wrap">
+            <Link
+              to="/payments/add"
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg"
+            >
+              + Add Payment
+            </Link>
+
+            <Link
+              to="/payments/import"
+              className="px-4 py-2 bg-green-600 text-white rounded-lg"
+            >
+              Import
+            </Link>
+
+            {selected.length > 0 && (
+              <button
+                onClick={bulkDelete}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg"
+              >
+                Delete ({selected.length})
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* SEARCH */}
+        <div className="grid md:grid-cols-3 gap-3">
           <input
             type="text"
-            placeholder="Search payments..."
+            placeholder="Search name / cheque / mode..."
             value={search}
             onChange={handleSearchChange}
-            className="border px-3 py-2 rounded-lg w-64 focus:ring-2 focus:ring-blue-500"
+            className="border rounded-xl px-4 py-3"
           />
 
           <select
@@ -127,64 +157,26 @@ export default function Payments() {
             onChange={(e) =>
               setCategoryFilter(e.target.value)
             }
-            className="border px-3 py-2 rounded-lg"
+            className="border rounded-xl px-4 py-3"
           >
             <option value="">All Categories</option>
-            <option value="Sheep">Sheep</option>
-            <option value="Cow">Cow</option>
-            <option value="Monthly Assistance">Monthly Assistance</option>
-            <option value="Education">Education</option>
-            <option value="Medical">Medical</option>
-            <option value="Livelihood Generation">Livelihood Generation</option>
-            <option value="Soft Loan">Soft Loan</option>
-            <option value="Salary">Salary</option>
-            <option value="Office Expense">Office Expense</option>
-            <option value="Other">Other</option>
+
+            {categories.map((cat) => (
+              <option key={cat}>{cat}</option>
+            ))}
           </select>
-        </div>
-
-        {/* Actions */}
-        <div className="flex gap-3">
-          <Link
-            to="/payments/add"
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
-          >
-            + Add Payment
-          </Link>
-
-          <Link
-            to="/payments/import"
-            className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700"
-          >
-            Import
-          </Link>
-
-          <button
-            onClick={exportCSV}
-            className="bg-gray-700 text-white px-4 py-2 rounded-lg hover:bg-gray-900"
-          >
-            Export
-          </button>
-
-          {selected.length > 0 && (
-            <button
-              onClick={bulkDelete}
-              className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700"
-            >
-              Delete Selected ({selected.length})
-            </button>
-          )}
         </div>
       </div>
 
-      {/* Table */}
-      <div className="overflow-x-auto shadow-lg rounded-lg">
-        <table className="w-full border-collapse text-sm">
+      {/* TABLE */}
+      <div className="bg-white rounded-2xl shadow overflow-x-auto">
+        <table className="w-full text-sm">
           <thead className="bg-blue-600 text-white">
             <tr>
               <th className="p-3"></th>
               <th className="p-3 text-left">Payee</th>
               <th className="p-3 text-left">Amount</th>
+              <th className="p-3 text-left">Cheque No</th>
               <th className="p-3 text-left">Category</th>
               <th className="p-3 text-left">Date</th>
               <th className="p-3 text-left">Actions</th>
@@ -195,52 +187,65 @@ export default function Payments() {
             {payments.map((p) => (
               <tr
                 key={p.id}
-                className="border-b hover:bg-gray-100"
+                className="border-b hover:bg-gray-50"
               >
                 <td className="p-3">
                   <input
                     type="checkbox"
                     checked={selected.includes(p.id)}
-                    onChange={() => toggleSelection(p.id)}
+                    onChange={() =>
+                      toggleSelection(p.id)
+                    }
                   />
                 </td>
 
                 <td className="p-3">{p.payee_name}</td>
 
-                <td className="p-3">
+                <td className="p-3 font-semibold text-green-600">
                   ₹{Number(p.amount).toLocaleString()}
+                </td>
+
+                {/* ✅ NEW COLUMN */}
+                <td className="p-3">
+                  {p.cheque_no || "---"}
                 </td>
 
                 <td className="p-3">{p.category}</td>
 
                 <td className="p-3">{p.payment_date}</td>
 
-                <td className="p-3 flex gap-3">
+                <td className="p-3 space-x-3">
                   <Link
                     to={`/payments/view/${p.id}`}
-                    className="text-blue-600 hover:underline"
+                    className="text-blue-600"
                   >
                     View
                   </Link>
 
-                  {/* FIXED EDIT ROUTE — no more dashboard redirect */}
                   <Link
                     to={`/payments/edit/${p.id}`}
-                    className="text-green-600 hover:underline"
+                    className="text-green-600"
                   >
                     Edit
                   </Link>
 
                   <button
                     onClick={async () => {
-                      if (!confirm("Delete this payment?")) return;
+                      if (
+                        !confirm(
+                          "Delete this payment?"
+                        )
+                      )
+                        return;
+
                       await supabase
                         .from("payments")
                         .delete()
                         .eq("id", p.id);
+
                       loadPayments();
                     }}
-                    className="text-red-600 hover:underline"
+                    className="text-red-600"
                   >
                     Delete
                   </button>
@@ -248,11 +253,11 @@ export default function Payments() {
               </tr>
             ))}
 
-            {!payments.length && (
+            {payments.length === 0 && (
               <tr>
                 <td
-                  colSpan={6}
-                  className="p-6 text-center text-gray-600"
+                  colSpan={7}
+                  className="p-6 text-center text-gray-500"
                 >
                   No payments found
                 </td>

@@ -4,21 +4,21 @@ interface SidebarProps {
   open: boolean;
   setOpen: (v: boolean) => void;
   role: string | null;
-  loading: boolean;
+  loading?: boolean;
 }
 
 export default function Sidebar({
   open,
   setOpen,
   role,
-  loading,
+  loading = false,
 }: SidebarProps) {
   const location = useLocation();
 
   if (loading) {
     return (
-      <aside className="fixed top-0 left-0 h-screen w-64 bg-[#071A36] text-white p-6 z-40">
-        Loading…
+      <aside className="h-screen w-64 bg-[#071A36] text-white p-6">
+        Loading...
       </aside>
     );
   }
@@ -61,56 +61,92 @@ export default function Sidebar({
     ],
   };
 
-  const normalizedRole = role?.toLowerCase() || "viewer";
-  const menu = menuConfig[normalizedRole] || menuConfig.viewer;
+  const normalizedRole =
+    role?.toLowerCase() || "viewer";
+
+  const menu =
+    menuConfig[normalizedRole] ||
+    menuConfig.viewer;
+
+  const handleClose = () => {
+    if (window.innerWidth < 768) {
+      setOpen(false);
+    }
+  };
 
   return (
     <aside
       className={`
-        fixed top-0 left-0 h-screen bg-[#071A36] text-white z-40
-        transition-all duration-300 overflow-y-auto
+        h-screen bg-[#071A36] text-white
+        transition-all duration-300
+        overflow-y-auto
         ${open ? "w-64" : "w-20"}
       `}
     >
-      <div className="flex items-center justify-between p-6">
-        {open && <h2 className="text-2xl font-bold">ZIST Admin</h2>}
-        <button onClick={() => setOpen(!open)}>☰</button>
+      {/* Header */}
+      <div className="flex items-center justify-between p-5 border-b border-white/10">
+        {open && (
+          <h2 className="text-2xl font-bold">
+            ZIST Admin
+          </h2>
+        )}
+
+        <button
+          onClick={() => setOpen(!open)}
+          className="text-xl hover:text-gray-300"
+        >
+          ☰
+        </button>
       </div>
 
+      {/* Role */}
       {open && (
-        <p className="text-gray-300 px-6 mb-4 text-sm">
+        <p className="text-gray-300 px-5 py-4 text-sm">
           Role: {normalizedRole}
         </p>
       )}
 
-      <nav className="space-y-2 px-4">
+      {/* Menu */}
+      <nav className="px-3 space-y-1">
         {menu.map((item) => {
           const active =
             location.pathname === item.to ||
-            location.pathname.startsWith(item.to + "/");
+            location.pathname.startsWith(
+              item.to + "/"
+            );
 
           return (
             <Link
               key={item.to}
               to={item.to}
-              className={`block py-2 px-3 rounded transition ${
-                active
-                  ? "bg-white text-black font-semibold"
-                  : "hover:bg-[#0A234A]"
-              }`}
+              onClick={handleClose}
+              className={`
+                block rounded-xl px-4 py-3 text-sm transition
+                ${
+                  active
+                    ? "bg-white text-black font-semibold"
+                    : "text-white hover:bg-white/10"
+                }
+              `}
             >
-              {item.label}
+              {open
+                ? item.label
+                : item.label.charAt(0)}
             </Link>
           );
         })}
       </nav>
 
-      <Link
-        to="/logout"
-        className="block mx-4 mt-10 mb-6 py-2 text-center bg-red-600 hover:bg-red-700 rounded"
-      >
-        Logout
-      </Link>
+      {/* Logout */}
+      <div className="p-4 mt-6">
+        <Link
+          to="/logout"
+          onClick={handleClose}
+          className="block w-full text-center py-3 rounded-xl bg-red-600 hover:bg-red-700 text-sm font-medium"
+        >
+          {open ? "Logout" : "⎋"}
+        </Link>
+      </div>
     </aside>
   );
 }

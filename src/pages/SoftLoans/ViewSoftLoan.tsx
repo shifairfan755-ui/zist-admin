@@ -208,7 +208,7 @@ export default function ViewSoftLoan() {
         to="/soft-loans"
         className="text-blue-600 text-sm font-medium"
       >
-        â† Back to
+        ← Back to
         Soft Loans
       </Link>
 
@@ -250,7 +250,7 @@ export default function ViewSoftLoan() {
 
               {loan.phone && (
                 <p className="text-slate-600 mt-2">
-                  ðŸ“ž{" "}
+                  ☎{" "}
                   {
                     loan.phone
                   }
@@ -259,7 +259,7 @@ export default function ViewSoftLoan() {
 
               {loan.address && (
                 <p className="text-slate-600 mt-1">
-                  ðŸ“{" "}
+                  ⌖{" "}
                   {
                     loan.address
                   }
@@ -473,7 +473,7 @@ export default function ViewSoftLoan() {
 
                       <td className="p-3">
                         {item.notes ||
-                          "â€”"}
+                          "—"}
                       </td>
                     </tr>
                   )

@@ -1,201 +1,188 @@
+
 import { useEffect, useState } from "react";
-import {
-  Link,
-  useNavigate,
-} from "react-router-dom";
+import { Link } from "react-router-dom";
 import { supabase } from "../../lib/supabaseClient";
 import toast from "react-hot-toast";
 
+type SoftLoan = {
+  id: string;
+  name: string;
+  parentage?: string | null;
+  phone?: string | null;
+  address?: string | null;
+  amount: number | string;
+  cheque_no?: string | null;
+  recommendation?: string | null;
+  loan_date?: string | null;
+  status: string | null;
+  created_at?: string | null;
+};
+
+type Installment = {
+  id: string;
+  loan_id: string;
+  amount: number | string;
+  date?: string | null;
+  notes?: string | null;
+};
+
+const STATUS_OPTIONS = [
+  { value: "Paying in Installments", label: "Running" },
+  { value: "Defaulter", label: "Defaulter" },
+  { value: "Paid on Time", label: "Completed / Paid" },
+  { value: "Closed as Imdaad", label: "Closed as Imdaad" },
+];
+
+const money = (amount: number) =>
+  `₹${amount.toLocaleString("en-IN", {
+    maximumFractionDigits: 2,
+  })}`;
+
 export default function SoftLoans() {
-  const [loans, setLoans] =
-    useState<any[]>([]);
-
-  const [loading, setLoading] =
-    useState(true);
-
-  const [search, setSearch] =
-    useState("");
-
-  const [statusFilter, setStatusFilter] =
-    useState("");
-
-  const [selected, setSelected] =
-    useState<string[]>([]);
-
-  const navigate =
-    useNavigate();
+  const [loans, setLoans] = useState<SoftLoan[]>([]);
+  const [installments, setInstallments] = useState<Installment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [selected, setSelected] = useState<string[]>([]);
 
   useEffect(() => {
-    loadLoans();
+    void loadLoans();
   }, []);
 
-  const loadLoans =
-    async () => {
-      setLoading(true);
+  const loadLoans = async () => {
+    setLoading(true);
 
-      const {
-        data,
-        error,
-      } =
-        await supabase
-          .from(
-            "soft_loans"
-          )
+    try {
+      const [loanResult, installmentResult] = await Promise.all([
+        supabase
+          .from("soft_loans")
           .select("*")
-          .order(
-            "created_at",
-            {
-              ascending: false,
-            }
-          );
+          .order("created_at", { ascending: false }),
 
-      if (error) {
-        toast.error(
-          "Failed to load soft loans"
-        );
+        supabase
+          .from("soft_loan_installments")
+          .select("id, loan_id, amount, date, notes"),
+      ]);
+
+      if (loanResult.error) {
+        console.error(loanResult.error);
+        toast.error("Failed to load soft loans");
+        return;
+      }
+
+      setLoans(loanResult.data || []);
+
+      if (installmentResult.error) {
+        console.error(installmentResult.error);
+        setInstallments([]);
+        toast.error("Could not load repayment records");
       } else {
-        setLoans(
-          data || []
-        );
+        setInstallments(installmentResult.data || []);
       }
-
+    } catch (error) {
+      console.error(error);
+      toast.error("Unable to load soft loan information");
+    } finally {
       setLoading(false);
-    };
+    }
+  };
 
-  const filtered =
-    loans.filter(
-      (loan) => {
-        const q =
-          search.toLowerCase();
+  // Total actual installments received for each loan.
+  const installmentTotals = installments.reduce<Record<string, number>>(
+    (totals, installment) => {
+      totals[installment.loan_id] =
+        (totals[installment.loan_id] || 0) +
+        Number(installment.amount || 0);
+      return totals;
+    },
+    {}
+  );
 
-        const matchSearch =
-          loan.name
-            ?.toLowerCase()
-            .includes(q) ||
-          loan.phone
-            ?.toLowerCase()
-            .includes(q) ||
-          loan.address
-            ?.toLowerCase()
-            .includes(q);
+  // A fully paid loan is recovered in full.
+  // Imdaad closure is not treated as cash recovery.
+  const getRecovered = (loan: SoftLoan) => {
+    const amount = Math.max(0, Number(loan.amount || 0));
 
-        const matchStatus =
-          statusFilter ===
-            "" ||
-          loan.status ===
-            statusFilter;
+    if (loan.status === "Paid on Time") {
+      return amount;
+    }
 
-        return (
-          matchSearch &&
-          matchStatus
-        );
-      }
-    );
-
-  const toggleSelect = (
-    id: string
-  ) => {
-    setSelected(
-      (prev) =>
-        prev.includes(
-          id
-        )
-          ? prev.filter(
-              (
-                x
-              ) =>
-                x !== id
-            )
-          : [
-              ...prev,
-              id,
-            ]
+    return Math.min(
+      amount,
+      Math.max(0, installmentTotals[loan.id] || 0)
     );
   };
 
-  const deleteSelected =
-    async () => {
-      if (
-        selected.length ===
-        0
-      )
-        return;
+  const getPending = (loan: SoftLoan) =>
+    Math.max(0, Number(loan.amount || 0) - getRecovered(loan));
 
-      const yes =
-        confirm(
-          `Delete ${selected.length} selected loans?`
-        );
+  const filtered = loans.filter((loan) => {
+    const q = search.trim().toLowerCase();
 
-      if (!yes)
-        return;
+    const matchSearch =
+      !q ||
+      (loan.name || "").toLowerCase().includes(q) ||
+      (loan.phone || "").toLowerCase().includes(q) ||
+      (loan.address || "").toLowerCase().includes(q);
 
-      const {
-        error,
-      } =
-        await supabase
-          .from(
-            "soft_loans"
-          )
-          .delete()
-          .in(
-            "id",
-            selected
-          );
+    const matchStatus =
+      statusFilter === "" || loan.status === statusFilter;
 
-      if (error) {
-        toast.error(
-          "Delete failed"
-        );
-        return;
-      }
+    return matchSearch && matchStatus;
+  });
 
-      toast.success(
-        "Deleted successfully"
-      );
+  const toggleSelect = (id: string) => {
+    setSelected((previous) =>
+      previous.includes(id)
+        ? previous.filter((item) => item !== id)
+        : [...previous, id]
+    );
+  };
 
-      setSelected([]);
-      loadLoans();
-    };
+  const deleteSelected = async () => {
+    if (selected.length === 0) return;
 
-  const totalLoan =
-    loans.reduce(
-      (
-        sum,
-        item
-      ) =>
-        sum +
-        Number(
-          item.amount ||
-            0
-        ),
-      0
+    const confirmed = window.confirm(
+      `Delete ${selected.length} selected loans? Their linked installment records will also be deleted.`
     );
 
-  const totalCases =
-    loans.length;
+    if (!confirmed) return;
 
-  const recovered =
-    loans.reduce(
-      (
-        sum,
-        item
-      ) =>
-        sum +
-        Number(
-          item.recovered ||
-            0
-        ),
-      0
-    );
+    const { error } = await supabase
+      .from("soft_loans")
+      .delete()
+      .in("id", selected);
 
-  const pending =
-    totalLoan -
-    recovered;
+    if (error) {
+      console.error(error);
+      toast.error("Delete failed");
+      return;
+    }
+
+    toast.success("Deleted successfully");
+    setSelected([]);
+    await loadLoans();
+  };
+
+  const totalLoan = loans.reduce(
+    (sum, loan) => sum + Number(loan.amount || 0),
+    0
+  );
+
+  const totalCases = loans.length;
+
+  const recovered = loans.reduce(
+    (sum, loan) => sum + getRecovered(loan),
+    0
+  );
+
+  const pending = Math.max(0, totalLoan - recovered);
 
   if (loading) {
     return (
       <div className="p-6 text-center font-semibold">
-        Loading...
+        Loading soft loans...
       </div>
     );
   }
@@ -208,29 +195,18 @@ export default function SoftLoans() {
           <h1 className="text-2xl md:text-3xl font-bold text-slate-800">
             Soft Loans
           </h1>
-
           <p className="text-sm text-slate-500 mt-1">
-            Manage loan
-            records,
-            recovery &
-            beneficiaries
+            Manage loan records, recovery &amp; beneficiaries
           </p>
         </div>
 
         <div className="grid grid-cols-2 md:flex gap-2">
-          {selected.length >
-            0 && (
+          {selected.length > 0 && (
             <button
-              onClick={
-                deleteSelected
-              }
+              onClick={deleteSelected}
               className="px-4 py-3 rounded-xl bg-red-600 text-white text-sm"
             >
-              Delete (
-              {
-                selected.length
-              }
-              )
+              Delete ({selected.length})
             </button>
           )}
 
@@ -243,29 +219,12 @@ export default function SoftLoans() {
         </div>
       </div>
 
-      {/* Stats */}
+      {/* Summary cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-        <Card
-          title="Cases"
-          value={
-            totalCases.toString()
-          }
-        />
-
-        <Card
-          title="Total Loan"
-          value={`₹${totalLoan.toLocaleString()}`}
-        />
-
-        <Card
-          title="Recovered"
-          value={`₹${recovered.toLocaleString()}`}
-        />
-
-        <Card
-          title="Pending"
-          value={`₹${pending.toLocaleString()}`}
-        />
+        <Card title="Cases" value={totalCases.toLocaleString("en-IN")} />
+        <Card title="Total Loan" value={money(totalLoan)} />
+        <Card title="Recovered" value={money(recovered)} />
+        <Card title="Pending" value={money(pending)} />
       </div>
 
       {/* Filters */}
@@ -274,226 +233,150 @@ export default function SoftLoans() {
           type="text"
           placeholder="Search loans..."
           value={search}
-          onChange={(
-            e
-          ) =>
-            setSearch(
-              e.target
-                .value
-            )
-          }
+          onChange={(event) => setSearch(event.target.value)}
           className="w-full rounded-xl border px-4 py-3 outline-none focus:ring-2 focus:ring-green-500"
         />
 
         <select
-          value={
-            statusFilter
-          }
-          onChange={(
-            e
-          ) =>
-            setStatusFilter(
-              e.target
-                .value
-            )
-          }
+          value={statusFilter}
+          onChange={(event) => setStatusFilter(event.target.value)}
           className="w-full rounded-xl border px-4 py-3"
         >
-          <option value="">
-            All Status
-          </option>
-          <option value="Pending">
-            Pending
-          </option>
-          <option value="Running">
-            Running
-          </option>
-          <option value="Completed">
-            Completed
-          </option>
-          <option value="Closed">
-            Closed
-          </option>
+          <option value="">All Status</option>
+          {STATUS_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
         </select>
+
+        <button
+          type="button"
+          onClick={() => {
+            setSearch("");
+            setStatusFilter("");
+            void loadLoans();
+          }}
+          className="w-full rounded-xl border px-4 py-3 text-slate-700 hover:bg-slate-50"
+        >
+          Refresh / Clear Filters
+        </button>
       </div>
 
-      {/* Desktop Table */}
+      {/* Desktop table */}
       <div className="hidden md:block bg-white rounded-2xl shadow overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-slate-100 text-slate-600">
             <tr>
               <th className="p-4"></th>
-              <th className="p-4 text-left">
-                Name
-              </th>
-              <th className="p-4 text-left">
-                Phone
-              </th>
-              <th className="p-4 text-left">
-                Amount
-              </th>
-              <th className="p-4 text-left">
-                Status
-              </th>
-              <th className="p-4 text-left">
-                Actions
-              </th>
+              <th className="p-4 text-left">Name</th>
+              <th className="p-4 text-left">Phone</th>
+              <th className="p-4 text-left">Loan Amount</th>
+              <th className="p-4 text-left">Recovered</th>
+              <th className="p-4 text-left">Pending</th>
+              <th className="p-4 text-left">Status</th>
+              <th className="p-4 text-left">Actions</th>
             </tr>
           </thead>
 
           <tbody>
-            {filtered.length ===
-            0 ? (
+            {filtered.length === 0 ? (
               <tr>
-                <td
-                  colSpan={6}
-                  className="p-8 text-center text-slate-500"
-                >
-                  No soft
-                  loans found.
+                <td colSpan={8} className="p-8 text-center text-slate-500">
+                  No soft loans found.
                 </td>
               </tr>
             ) : (
-              filtered.map(
-                (
-                  loan
-                ) => (
-                  <tr
-                    key={
-                      loan.id
-                    }
-                    className="border-t hover:bg-slate-50"
-                  >
-                    <td className="p-4">
-                      <input
-                        type="checkbox"
-                        checked={selected.includes(
-                          loan.id
-                        )}
-                        onChange={() =>
-                          toggleSelect(
-                            loan.id
-                          )
-                        }
-                      />
-                    </td>
-
-                    <td className="p-4 font-medium">
-                      {
-                        loan.name
-                      }
-                    </td>
-
-                    <td className="p-4">
-                      {
-                        loan.phone
-                      }
-                    </td>
-
-                    <td className="p-4 text-green-700 font-semibold">
-                      ₹
-                      {Number(
-                        loan.amount
-                      ).toLocaleString()}
-                    </td>
-
-                    <td className="p-4">
-                      {
-                        loan.status
-                      }
-                    </td>
-
-                    <td className="p-4">
-                      <Link
-                        to={`/soft-loans/view/${loan.id}`}
-                        className="text-blue-600 hover:underline"
-                      >
-                        View
-                      </Link>
-                    </td>
-                  </tr>
-                )
-              )
+              filtered.map((loan) => (
+                <tr key={loan.id} className="border-t hover:bg-slate-50">
+                  <td className="p-4">
+                    <input
+                      type="checkbox"
+                      checked={selected.includes(loan.id)}
+                      onChange={() => toggleSelect(loan.id)}
+                      aria-label={`Select ${loan.name}`}
+                    />
+                  </td>
+                  <td className="p-4 font-medium">{loan.name}</td>
+                  <td className="p-4">{loan.phone || "—"}</td>
+                  <td className="p-4 text-green-700 font-semibold">
+                    {money(Number(loan.amount || 0))}
+                  </td>
+                  <td className="p-4 text-blue-700">
+                    {money(getRecovered(loan))}
+                  </td>
+                  <td className="p-4 text-orange-700">
+                    {money(getPending(loan))}
+                  </td>
+                  <td className="p-4">{loan.status || "—"}</td>
+                  <td className="p-4">
+                    <Link
+                      to={`/soft-loans/view/${loan.id}`}
+                      className="text-blue-600 hover:underline"
+                    >
+                      View
+                    </Link>
+                  </td>
+                </tr>
+              ))
             )}
           </tbody>
         </table>
       </div>
 
-      {/* Mobile Cards */}
+      {/* Mobile cards */}
       <div className="md:hidden space-y-4">
-        {filtered.length ===
-        0 ? (
+        {filtered.length === 0 ? (
           <div className="bg-white rounded-2xl shadow p-6 text-center text-slate-500">
-            No soft loans
-            found.
+            No soft loans found.
           </div>
         ) : (
-          filtered.map(
-            (loan) => (
-              <div
-                key={
-                  loan.id
-                }
-                className="bg-white rounded-2xl shadow p-4"
-              >
-                <div className="flex justify-between gap-3">
-                  <div>
-                    <h3 className="font-semibold text-slate-800">
-                      {
-                        loan.name
-                      }
-                    </h3>
-
-                    <p className="text-sm text-slate-500">
-                      {
-                        loan.phone
-                      }
-                    </p>
-                  </div>
-
-                  <input
-                    type="checkbox"
-                    checked={selected.includes(
-                      loan.id
-                    )}
-                    onChange={() =>
-                      toggleSelect(
-                        loan.id
-                      )
-                    }
-                  />
-                </div>
-
-                <div className="mt-4 text-sm space-y-1 text-slate-600">
-                  <p>
-                    <span className="font-medium">
-                      Amount:
-                    </span>{" "}
-                    ₹
-                    {Number(
-                      loan.amount
-                    ).toLocaleString()}
-                  </p>
-
-                  <p>
-                    <span className="font-medium">
-                      Status:
-                    </span>{" "}
-                    {
-                      loan.status
-                    }
+          filtered.map((loan) => (
+            <div key={loan.id} className="bg-white rounded-2xl shadow p-4">
+              <div className="flex justify-between gap-3">
+                <div>
+                  <h3 className="font-semibold text-slate-800">
+                    {loan.name}
+                  </h3>
+                  <p className="text-sm text-slate-500">
+                    {loan.phone || "No phone"}
                   </p>
                 </div>
-
-                <Link
-                  to={`/soft-loans/view/${loan.id}`}
-                  className="inline-block mt-4 px-4 py-2 rounded-lg bg-blue-50 text-blue-700 text-sm"
-                >
-                  View
-                </Link>
+                <input
+                  type="checkbox"
+                  checked={selected.includes(loan.id)}
+                  onChange={() => toggleSelect(loan.id)}
+                  aria-label={`Select ${loan.name}`}
+                />
               </div>
-            )
-          )
+
+              <div className="mt-4 text-sm space-y-2 text-slate-600">
+                <p>
+                  <span className="font-medium">Loan Amount: </span>
+                  {money(Number(loan.amount || 0))}
+                </p>
+                <p>
+                  <span className="font-medium">Recovered: </span>
+                  {money(getRecovered(loan))}
+                </p>
+                <p>
+                  <span className="font-medium">Pending: </span>
+                  {money(getPending(loan))}
+                </p>
+                <p>
+                  <span className="font-medium">Status: </span>
+                  {loan.status || "—"}
+                </p>
+              </div>
+
+              <Link
+                to={`/soft-loans/view/${loan.id}`}
+                className="inline-block mt-4 px-4 py-2 rounded-lg bg-blue-50 text-blue-700 text-sm"
+              >
+                View
+              </Link>
+            </div>
+          ))
         )}
       </div>
     </div>
@@ -503,16 +386,14 @@ export default function SoftLoans() {
 function Card({
   title,
   value,
-}: any) {
+}: {
+  title: string;
+  value: string;
+}) {
   return (
     <div className="bg-white rounded-2xl shadow p-4">
-      <p className="text-xs text-slate-500">
-        {title}
-      </p>
-
-      <h3 className="text-lg font-bold text-slate-800 mt-1">
-        {value}
-      </h3>
+      <p className="text-xs text-slate-500">{title}</p>
+      <h3 className="text-lg font-bold text-slate-800 mt-1">{value}</h3>
     </div>
   );
 }

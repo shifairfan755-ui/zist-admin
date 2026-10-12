@@ -1,4 +1,4 @@
-import {
+﻿import {
   useEffect,
   useState,
 } from "react";
@@ -154,42 +154,29 @@ export default function ViewSoftLoan() {
     );
   }
 
-  const totalPaid =
-    installments.reduce(
-      (
-        total,
-        item
-      ) =>
-        total +
-        Number(
-          item.amount ||
-            0
-        ),
-      0
-    );
+  const installmentTotal = installments.reduce(
+    (total, item) => total + Number(item.amount || 0),
+    0
+  );
 
-  const remaining =
-    Number(
-      loan.amount ||
-        0
-    ) - totalPaid;
+  // A loan marked Paid on Time is considered fully recovered.
+  const totalPaid =
+    loan.status === "Paid on Time"
+      ? Number(loan.amount || 0)
+      : Math.min(installmentTotal, Number(loan.amount || 0));
+
+  const remaining = Math.max(
+    0,
+    Number(loan.amount || 0) - totalPaid
+  );
 
   const percentPaid =
-    Number(
-      loan.amount
-    ) > 0
+    Number(loan.amount || 0) > 0
       ? Math.min(
           100,
-          Math.round(
-            (totalPaid /
-              Number(
-                loan.amount
-              )) *
-              100
-          )
+          Math.round((totalPaid / Number(loan.amount)) * 100)
         )
       : 0;
-
   const badgeColor =
     (
       status: string
@@ -221,7 +208,7 @@ export default function ViewSoftLoan() {
         to="/soft-loans"
         className="text-blue-600 text-sm font-medium"
       >
-        ← Back to
+        â† Back to
         Soft Loans
       </Link>
 
@@ -263,7 +250,7 @@ export default function ViewSoftLoan() {
 
               {loan.phone && (
                 <p className="text-slate-600 mt-2">
-                  📞{" "}
+                  ðŸ“ž{" "}
                   {
                     loan.phone
                   }
@@ -272,7 +259,7 @@ export default function ViewSoftLoan() {
 
               {loan.address && (
                 <p className="text-slate-600 mt-1">
-                  📍{" "}
+                  ðŸ“{" "}
                   {
                     loan.address
                   }
@@ -486,7 +473,7 @@ export default function ViewSoftLoan() {
 
                       <td className="p-3">
                         {item.notes ||
-                          "—"}
+                          "â€”"}
                       </td>
                     </tr>
                   )

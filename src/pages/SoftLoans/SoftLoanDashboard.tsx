@@ -16,22 +16,40 @@ import {
   Legend,
 } from "recharts";
 
+type Loan = {
+  id: string;
+  amount: number | string;
+  status: string | null;
+};
+
+type Installment = {
+  id: string;
+  loan_id: string;
+  amount: number | string;
+  date?: string | null;
+  notes?: string | null;
+};
+
 export default function SoftLoanDashboard() {
-  const [loans, setLoans] = useState<any[]>([]);
-  const [installments, setInstallments] = useState<any[]>([]);
+  const [loans, setLoans] = useState<Loan[]>([]);
+  const [installments, setInstallments] = useState<Installment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
-    loadData();
+    void loadData();
   }, []);
 
   const loadData = async () => {
     setLoading(true);
+    setLoadError(false);
 
     try {
       const [loanRes, instRes] = await Promise.all([
-        supabase.from("soft_loans").select("*"),
-        supabase.from("soft_loan_installments").select("*"),
+        supabase.from("soft_loans").select("id, amount, status"),
+        supabase
+          .from("soft_loan_installments")
+          .select("id, loan_id, amount, date, notes"),
       ]);
 
       if (loanRes.error) throw loanRes.error;
@@ -41,6 +59,7 @@ export default function SoftLoanDashboard() {
       setInstallments(instRes.data || []);
     } catch (error) {
       console.error("Failed to load soft loan dashboard:", error);
+      setLoadError(true);
       setLoans([]);
       setInstallments([]);
     } finally {
@@ -48,9 +67,8 @@ export default function SoftLoanDashboard() {
     }
   };
 
-  const safeDate = (value: any) => {
+  const safeDate = (value: string | null | undefined) => {
     if (!value) return null;
-
     const date = new Date(value);
     return Number.isNaN(date.getTime()) ? null : date;
   };
@@ -58,40 +76,60 @@ export default function SoftLoanDashboard() {
   if (loading) {
     return (
       <div className="p-6 text-center font-semibold">
-        Loading...
+        Loading soft loan dashboard...
       </div>
     );
   }
 
-  // Portfolio totals
+  if (loadError) {
+    return (
+      <div className="p-6 text-center text-red-600">
+        Could not load soft loan data. Please refresh the page.
+        <button
+          type="button"
+          onClick={() => void loadData()}
+          className="ml-3 underline"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  // Use the same installment totals and recovery rules as SoftLoans.tsx.
+  const installmentTotals = installments.reduce<Record<string, number>>(
+    (totals, installment) => {
+      const loanId = String(installment.loan_id);
+      totals[loanId] =
+        (totals[loanId] || 0) + Number(installment.amount || 0);
+      return totals;
+    },
+    {}
+  );
+
+  const getRecovered = (loan: Loan) => {
+    const amount = Math.max(0, Number(loan.amount || 0));
+
+    if (loan.status === "Paid on Time") {
+      return amount;
+    }
+
+    // Closed as Imdaad is not treated as cash recovery.
+    return Math.min(
+      amount,
+      Math.max(0, installmentTotals[String(loan.id)] || 0)
+    );
+  };
+
   const totalLoan = loans.reduce(
-    (sum, loan) => sum + Number(loan.amount || 0),
+    (sum, loan) => sum + Math.max(0, Number(loan.amount || 0)),
     0
   );
 
-  // Calculate recovery for each loan consistently:
-  // "Paid on Time" means the complete loan amount is recovered.
-  // Other loans use their recorded installment payments.
-  const recovered = loans.reduce((sum, loan) => {
-    const loanAmount = Number(loan.amount || 0);
-
-    if (loan.status === "Paid on Time") {
-      return sum + loanAmount;
-    }
-
-    const loanInstallments = installments
-      .filter(
-        (item) =>
-          String(item.soft_loan_id) === String(loan.id)
-      )
-      .reduce(
-        (installmentSum, item) =>
-          installmentSum + Number(item.amount || 0),
-        0
-      );
-
-    return sum + Math.min(loanInstallments, loanAmount);
-  }, 0);
+  const recovered = loans.reduce(
+    (sum, loan) => sum + getRecovered(loan),
+    0
+  );
 
   const pending = Math.max(0, totalLoan - recovered);
 
@@ -103,7 +141,7 @@ export default function SoftLoanDashboard() {
     (loan) => loan.status === "Paying in Installments"
   ).length;
 
-  // Monthly recovery chart: actual recorded installments only.
+  // Chart shows actual recorded installments by month.
   const monthMap: Record<string, number> = {};
 
   installments.forEach((item) => {
@@ -123,7 +161,6 @@ export default function SoftLoanDashboard() {
     ([month, amount]) => ({ month, amount })
   );
 
-  // Loan status distribution
   const statusMap: Record<string, number> = {};
 
   loans.forEach((loan) => {
@@ -150,7 +187,6 @@ export default function SoftLoanDashboard() {
 
   return (
     <div className="p-3 md:p-6">
-      {/* Header */}
       <div className="mb-6">
         <h1 className="text-2xl md:text-3xl font-bold text-slate-800">
           Soft Loan Dashboard
@@ -160,7 +196,6 @@ export default function SoftLoanDashboard() {
         </p>
       </div>
 
-      {/* Statistics */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
         <Card title="Total Loan" value={formatCurrency(totalLoan)} />
         <Card title="Recovered" value={formatCurrency(recovered)} />
@@ -169,12 +204,9 @@ export default function SoftLoanDashboard() {
         <Card title="Active" value={activeLoans} />
       </div>
 
-      {/* Charts */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <section className="bg-white rounded-2xl shadow p-4 md:p-6">
-          <h2 className="text-lg font-semibold mb-4">
-            Monthly Recovery
-          </h2>
+          <h2 className="text-lg font-semibold mb-4">Monthly Recovery</h2>
 
           {monthlyData.length === 0 ? (
             <Empty />
@@ -186,7 +218,9 @@ export default function SoftLoanDashboard() {
                   <XAxis dataKey="month" />
                   <YAxis />
                   <Tooltip
-                    formatter={(value: any) => formatCurrency(Number(value))}
+                    formatter={(value: any) =>
+                      formatCurrency(Number(value))
+                    }
                   />
                   <Bar
                     dataKey="amount"
@@ -233,11 +267,8 @@ export default function SoftLoanDashboard() {
         </section>
       </div>
 
-      {/* Portfolio Summary */}
       <div className="mt-6 bg-white rounded-2xl shadow p-4 md:p-6">
-        <h2 className="text-lg font-semibold mb-4">
-          Portfolio Summary
-        </h2>
+        <h2 className="text-lg font-semibold mb-4">Portfolio Summary</h2>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
           <Summary

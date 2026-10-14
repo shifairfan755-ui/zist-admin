@@ -1,393 +1,268 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
-/* -----------------------------------------
-   Generate Soft Loan PDF
------------------------------------------ */
-export const generateLoanPDF = (
-  loan: any,
-  installments: any[]
-) => {
+export const generateLoanPDF = (loan: any, installments: any[]) => {
   const doc = new jsPDF({
     orientation: "portrait",
     unit: "mm",
     format: "a4",
   });
 
-  /* -----------------------------------------
-     PREP DATA
-  ----------------------------------------- */
-  const totalPaid =
-    installments.reduce(
-      (
-        sum: number,
-        item: any
-      ) =>
-        sum +
-        Number(
-          item.amount ||
-            0
-        ),
-      0
-    );
+  const pageWidth = 210;
+  const left = 12;
+  const right = 198;
+  const contentWidth = right - left;
+  const loanAmount = Number(loan.amount || 0);
 
-  const balance =
-    Number(
-      loan.amount ||
-        0
-    ) - totalPaid;
-
-  /* -----------------------------------------
-     HEADER
-  ----------------------------------------- */
-  doc.setFillColor(
-    16,
-    185,
-    129
-  );
-
-  doc.rect(
-    0,
-    0,
-    210,
-    25,
-    "F"
-  );
-
-  doc.setTextColor(
-    255,
-    255,
-    255
-  );
-
-  doc.setFontSize(18);
-
-  doc.text(
-    "ZIST FOUNDATION",
-    105,
-    11,
-    {
-      align:
-        "center",
-    }
-  );
-
-  doc.setFontSize(11);
-
-  doc.text(
-    "Soft Loan Profile Report",
-    105,
-    18,
-    {
-      align:
-        "center",
-    }
-  );
-
-  /* -----------------------------------------
-     TITLE
-  ----------------------------------------- */
-  doc.setTextColor(
-    0,
-    0,
+  const installmentTotal = installments.reduce(
+    (sum: number, item: any) => sum + Number(item.amount || 0),
     0
   );
 
-  doc.setFontSize(15);
+  const totalPaid =
+    loan.status === "Paid on Time"
+      ? loanAmount
+      : Math.min(installmentTotal, loanAmount);
+
+  const balance = Math.max(0, loanAmount - totalPaid);
+
+  const formatAmount = (value: number) =>
+    "Rs. " +
+    Number(value || 0).toLocaleString("en-IN", {
+      maximumFractionDigits: 2,
+    });
+
+  const display = (value: any) =>
+    value !== null &&
+    value !== undefined &&
+    String(value).trim() !== ""
+      ? String(value)
+      : "-";
+
+  const formatDate = (value: any) => {
+    if (!value) return "-";
+    const dateText = String(value);
+    const match = dateText.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+
+    return match
+      ? match[3] + "-" + match[2] + "-" + match[1]
+      : dateText;
+  };
+
+  /* HEADER */
+  doc.setFillColor(16, 185, 129);
+  doc.rect(0, 0, pageWidth, 25, "F");
+
+  doc.setTextColor(255, 255, 255);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(17);
+  doc.text("ZIST FOUNDATION", pageWidth / 2, 10.5, {
+    align: "center",
+  });
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.text(
+    "Soft Loan Profile & Recovery Statement",
+    pageWidth / 2,
+    18,
+    { align: "center" }
+  );
+
+  /* BORROWER DETAILS */
+  doc.setTextColor(0, 0, 0);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(13);
+  doc.text("Borrower Details", left, 34);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+
+  doc.text("Name: " + display(loan.name), left, 43);
+  doc.text("Parentage: " + display(loan.parentage), left, 51);
+  doc.text("Phone: " + display(loan.phone), left, 59);
+  doc.text("Address: " + display(loan.address), left, 67);
+
+  doc.text("Loan Amount: " + formatAmount(loanAmount), 108, 43);
+  doc.text("Cheque No: " + display(loan.cheque_no), 108, 51);
+  doc.text("Loan Date: " + formatDate(loan.loan_date), 108, 59);
+  doc.text("Status: " + display(loan.status), 108, 67);
 
   doc.text(
-    "Borrower Details",
-    14,
-    35
+    "Recommendation: " + display(loan.recommendation),
+    left,
+    77,
+    { maxWidth: 115 }
   );
 
-  /* -----------------------------------------
-     BORROWER DETAILS
-  ----------------------------------------- */
-  const leftX = 14;
-  const rightX = 110;
+  doc.text("Record Ref: " + display(loan.id), 108, 77, {
+    maxWidth: 88,
+  });
 
-  doc.setFontSize(11);
+  doc.setDrawColor(170, 170, 170);
+  doc.line(left, 83, right, 83);
 
-  doc.text(
-    `Name: ${
-      loan.name ||
-      "---"
-    }`,
-    leftX,
-    45
-  );
+  /* FINANCIAL SUMMARY */
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(13);
+  doc.text("Financial Summary", left, 92);
 
-  doc.text(
-    `Parentage: ${
-      loan.parentage ||
-      "---"
-    }`,
-    leftX,
-    53
-  );
-
-  doc.text(
-    `Phone: ${
-      loan.phone ||
-      "---"
-    }`,
-    leftX,
-    61
-  );
-
-  doc.text(
-    `Address: ${
-      loan.address ||
-      "---"
-    }`,
-    leftX,
-    69
-  );
-
-  doc.text(
-    `Loan Amount: ₹${Number(
-      loan.amount ||
-        0
-    ).toLocaleString()}`,
-    rightX,
-    45
-  );
-
-  doc.text(
-    `Cheque No: ${
-      loan.cheque_no ||
-      "---"
-    }`,
-    rightX,
-    53
-  );
-
-  doc.text(
-    `Loan Date: ${
-      loan.loan_date ||
-      "---"
-    }`,
-    rightX,
-    61
-  );
-
-  doc.text(
-    `Status: ${
-      loan.status ||
-      "---"
-    }`,
-    rightX,
-    69
-  );
-
-  doc.text(
-    `Recommendation: ${
-      loan.recommendation ||
-      "---"
-    }`,
-    14,
-    79
-  );
-
-  doc.line(
-    14,
-    85,
-    196,
-    85
-  );
-
-  /* -----------------------------------------
-     SUMMARY BOXES
-  ----------------------------------------- */
-  doc.setFontSize(15);
-
-  doc.text(
-    "Financial Summary",
-    14,
-    95
-  );
+  const boxGap = 3;
+  const boxWidth = (contentWidth - boxGap * 2) / 3;
 
   const drawBox = (
     x: number,
-    y: number,
     title: string,
     value: string
   ) => {
-    doc.setDrawColor(
-      220
-    );
+    doc.setDrawColor(210, 210, 210);
+    doc.setFillColor(248, 250, 249);
+    doc.roundedRect(x, 97, boxWidth, 22, 2, 2, "FD");
 
-    doc.roundedRect(
-      x,
-      y,
-      56,
-      22,
-      2,
-      2
-    );
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(100, 100, 100);
+    doc.text(title, x + 2.5, 104);
 
-    doc.setFontSize(
-      9
-    );
-
-    doc.setTextColor(
-      120
-    );
-
-    doc.text(
-      title,
-      x + 3,
-      y + 7
-    );
-
-    doc.setFontSize(
-      11
-    );
-
-    doc.setTextColor(
-      0
-    );
-
-    doc.text(
-      value,
-      x + 3,
-      y + 15
-    );
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.setTextColor(0, 0, 0);
+    doc.text(value, x + 2.5, 112);
   };
 
+  drawBox(left, "Loan Amount", formatAmount(loanAmount));
+  drawBox(left + boxWidth + boxGap, "Recovered", formatAmount(totalPaid));
   drawBox(
-    14,
-    100,
-    "Loan Amount",
-    `₹${Number(
-      loan.amount ||
-        0
-    ).toLocaleString()}`
+    left + (boxWidth + boxGap) * 2,
+    "Outstanding Balance",
+    formatAmount(balance)
   );
 
-  drawBox(
-    76,
-    100,
-    "Recovered",
-    `₹${totalPaid.toLocaleString()}`
-  );
-
-  drawBox(
-    138,
-    100,
-    "Balance",
-    `₹${balance.toLocaleString()}`
-  );
-
-  /* -----------------------------------------
-     INSTALLMENT TABLE
-  ----------------------------------------- */
-  doc.setFontSize(15);
-
-  doc.text(
-    "Installment History",
-    14,
-    135
-  );
+  /* INSTALLMENT HISTORY */
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(13);
+  doc.text("Installment History", left, 129);
 
   const rows =
-    installments.length ===
-    0
-      ? [
-          [
-            "-",
-            "-",
-            "No installments found",
-            "-",
-          ],
-        ]
-      : installments.map(
-          (
-            item: any,
-            index: number
-          ) => [
-            index + 1,
-            `₹${Number(
-              item.amount ||
-                0
-            ).toLocaleString()}`,
-            item.payment_date ||
-              item.date ||
-              "-",
-            item.notes ||
-              "-",
-          ]
-        );
+    installments.length === 0
+      ? [["-", "-", "-", "-", "-", "-", "-", "-", "No installments found"]]
+      : installments.map((item: any, index: number) => [
+          String(index + 1),
+          formatDate(item.payment_date || item.date),
+          formatAmount(Number(item.amount || 0)),
+          display(item.payment_mode),
+          display(item.reference_number),
+          display(item.received_by),
+          display(item.receipt_number),
+          display(item.deposited_into),
+          display(item.notes),
+        ]);
 
   autoTable(doc, {
-    startY: 140,
-    head: [
-      [
-        "#",
-        "Amount",
-        "Date",
-        "Notes",
-      ],
-    ],
+    startY: 134,
+    margin: { left, right: 12, bottom: 30, top: 12 },
+    head: [[
+      "#",
+      "Date",
+      "Amount",
+      "Mode",
+      "Reference No.",
+      "Received By",
+      "Receipt No.",
+      "Deposited Into",
+      "Notes",
+    ]],
     body: rows,
     theme: "grid",
+    showHead: "everyPage",
     styles: {
-      fontSize: 10,
-      cellPadding: 2,
+      font: "helvetica",
+      fontSize: 6.5,
+      cellPadding: 1.4,
+      overflow: "linebreak",
+      valign: "middle",
+      textColor: [35, 35, 35],
+      lineColor: [210, 210, 210],
+      lineWidth: 0.15,
     },
     headStyles: {
-      fillColor: [
-        16,
-        185,
-        129,
-      ],
+      fillColor: [16, 185, 129],
+      textColor: [255, 255, 255],
+      fontStyle: "bold",
+      fontSize: 6.5,
+    },
+    columnStyles: {
+      0: { cellWidth: 7 },
+      1: { cellWidth: 17 },
+      2: { cellWidth: 22 },
+      3: { cellWidth: 17 },
+      4: { cellWidth: 27 },
+      5: { cellWidth: 23 },
+      6: { cellWidth: 22 },
+      7: { cellWidth: 29 },
+      8: { cellWidth: 21 },
     },
   });
 
-  /* -----------------------------------------
-     FOOTER
-  ----------------------------------------- */
-  const finalY =
-    (
-      doc as any
-    ).lastAutoTable
-      ?.finalY ||
-    250;
+  /* SIGNATURES */
+  let signatureY = (doc as any).lastAutoTable?.finalY || 140;
 
-  doc.setFontSize(10);
+  signatureY += 12;
 
-  doc.setTextColor(
-    120
+  if (signatureY + 20 > 185) {
+    doc.addPage();
+    signatureY = 35;
+  }
+
+  doc.setTextColor(0, 0, 0);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8.5);
+
+  doc.text("Prepared By", 16, signatureY);
+  doc.text("Verified By", 77, signatureY);
+  doc.text("Authorized Signatory", 138, signatureY);
+
+  doc.setDrawColor(100, 100, 100);
+  doc.line(14, signatureY + 14, 62, signatureY + 14);
+  doc.line(75, signatureY + 14, 123, signatureY + 14);
+  doc.line(136, signatureY + 14, 194, signatureY + 14);
+
+  /* FOOTER AND PAGE NUMBERS */
+  const pageCount = doc.getNumberOfPages();
+  const generatedOn = new Date().toLocaleString();
+
+  for (let page = 1; page <= pageCount; page++) {
+    doc.setPage(page);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7.5);
+    doc.setTextColor(110, 110, 110);
+
+    doc.text("Generated on " + generatedOn, left, 199);
+
+    doc.text(
+      "ZIST Beneficiary Management System",
+      pageWidth / 2,
+      204,
+      { align: "center" }
+    );
+
+    doc.text(
+      "Page " + page + " of " + pageCount,
+      right,
+      199,
+      { align: "right" }
+    );
+  }
+
+  /* SAVE PDF */
+  const safeName = String(loan.name || "Profile").replace(
+    /[\\/:*?"<>|]/g,
+    "_"
   );
 
-  doc.text(
-    `Generated on ${new Date().toLocaleString()}`,
-    14,
-    finalY + 10
-  );
-
-  doc.text(
-    "Generated by ZIST Beneficiary Management System",
-    105,
-    287,
-    {
-      align:
-        "center",
-    }
-  );
-
-  /* -----------------------------------------
-     SAVE
-  ----------------------------------------- */
-  doc.save(
-    `SoftLoan_${loan.name || "Profile"}.pdf`
-  );
+  doc.save("SoftLoan_" + safeName + ".pdf");
 };
 
-/* -----------------------------------------
-   Empty Component
------------------------------------------ */
 export default function LoanPDF() {
   return <></>;
 }

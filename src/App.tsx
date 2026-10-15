@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from "react-router-dom";
+﻿import { Routes, Route, Navigate } from "react-router-dom";
 
 import ProtectedRoute from "./components/ProtectedRoute";
 import RoleProtectedRoute from "./pages/RoleProtectedRoute";
@@ -41,6 +41,7 @@ import ViewSoftLoan from "./pages/SoftLoans/ViewSoftLoan";
 import AddInstallment from "./pages/SoftLoans/AddInstallment";
 import EditInstallment from "./pages/SoftLoans/EditInstallment";
 import LoanPDF from "./pages/SoftLoans/LoanPDF";
+import ImdaadManagement from "./pages/SoftLoans/ImdaadManagement";
 
 /* ================= DONORS ================= */
 import Donors from "./pages/Donors";
@@ -131,6 +132,7 @@ export default function App() {
         {/* ================= ADMIN ONLY ================= */}
         <Route element={<RoleProtectedRoute allowedRoles={["admin"]} />}>
 
+          <Route path="soft-loans/imdaad" element={<ImdaadManagement />} />
           <Route path="payments" element={<Payments />} />
 <Route path="payments/view/:id" element={<ViewPayment />} />
 <Route path="payments/add" element={<AddPayment />} />
@@ -168,3 +170,4 @@ export default function App() {
     </Routes>
   );
 }
+

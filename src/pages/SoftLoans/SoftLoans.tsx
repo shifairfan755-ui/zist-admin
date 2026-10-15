@@ -18,6 +18,11 @@ type SoftLoan = {
   created_at?: string | null;
 };
 
+type ImdaadApproval = {
+  id: string;
+  loan_id: string;
+  approved_amount: number | string;
+};
 type Installment = {
   id: string;
   loan_id: string;
@@ -41,6 +46,7 @@ const money = (amount: number) =>
 export default function SoftLoans() {
   const [loans, setLoans] = useState<SoftLoan[]>([]);
   const [installments, setInstallments] = useState<Installment[]>([]);
+  const [imdaadApprovals, setImdaadApprovals] = useState<ImdaadApproval[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
@@ -54,12 +60,12 @@ export default function SoftLoans() {
     setLoading(true);
 
     try {
-      const [loanResult, installmentResult] = await Promise.all([
+      const [loanResult, imdaadResult, installmentResult] = await Promise.all([
         supabase
           .from("soft_loans")
           .select("*")
           .order("created_at", { ascending: false }),
-
+        supabase.from("soft_loan_imdaad").select("id, loan_id, approved_amount"),
         supabase
           .from("soft_loan_installments")
           .select("id, loan_id, amount, date, notes"),
@@ -71,6 +77,8 @@ export default function SoftLoans() {
         return;
       }
 
+      if (imdaadResult.error) throw imdaadResult.error;
+      setImdaadApprovals(imdaadResult.data || []);
       setLoans(loanResult.data || []);
 
       if (installmentResult.error) {
@@ -114,8 +122,21 @@ export default function SoftLoans() {
     );
   };
 
+  const getImdaad = (loan: SoftLoan) =>
+    imdaadApprovals
+      .filter((approval) => approval.loan_id === loan.id)
+      .reduce(
+        (sum, approval) =>
+          sum + Math.max(0, Number(approval.approved_amount || 0)),
+        0
+      );
+
   const getPending = (loan: SoftLoan) =>
-    Math.max(0, Number(loan.amount || 0) - getRecovered(loan));
+    Math.max(
+      0,
+      Number(loan.amount || 0) - getRecovered(loan) - getImdaad(loan)
+    );
+
 
   const filtered = loans.filter((loan) => {
     const q = search.trim().toLowerCase();
@@ -177,7 +198,8 @@ export default function SoftLoans() {
     0
   );
 
-  const pending = Math.max(0, totalLoan - recovered);
+  const totalImdaad = loans.reduce((sum, loan) => sum + getImdaad(loan), 0);
+  const pending = loans.reduce((sum, loan) => sum + getPending(loan), 0);
 
   if (loading) {
     return (
@@ -220,10 +242,11 @@ export default function SoftLoans() {
       </div>
 
       {/* Summary cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
         <Card title="Cases" value={totalCases.toLocaleString("en-IN")} />
         <Card title="Total Loan" value={money(totalLoan)} />
         <Card title="Recovered" value={money(recovered)} />
+        <Card title="Imdaad" value={money(totalImdaad)} />
         <Card title="Pending" value={money(pending)} />
       </div>
 
@@ -273,6 +296,7 @@ export default function SoftLoans() {
               <th className="p-4 text-left">Phone</th>
               <th className="p-4 text-left">Loan Amount</th>
               <th className="p-4 text-left">Recovered</th>
+              <th className="p-4 text-left">Imdaad</th>
               <th className="p-4 text-left">Pending</th>
               <th className="p-4 text-left">Status</th>
               <th className="p-4 text-left">Actions</th>
@@ -282,7 +306,7 @@ export default function SoftLoans() {
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={8} className="p-8 text-center text-slate-500">
+                <td colSpan={9} className="p-8 text-center text-slate-500">
                   No soft loans found.
                 </td>
               </tr>
@@ -298,17 +322,20 @@ export default function SoftLoans() {
                     />
                   </td>
                   <td className="p-4 font-medium">{loan.name}</td>
-                  <td className="p-4">{loan.phone || "—"}</td>
+                  <td className="p-4">{loan.phone || "â€”"}</td>
                   <td className="p-4 text-green-700 font-semibold">
                     {money(Number(loan.amount || 0))}
                   </td>
                   <td className="p-4 text-blue-700">
                     {money(getRecovered(loan))}
                   </td>
+                  <td className="p-4 text-purple-700">
+                    {money(getImdaad(loan))}
+                  </td>
                   <td className="p-4 text-orange-700">
                     {money(getPending(loan))}
                   </td>
-                  <td className="p-4">{loan.status || "—"}</td>
+                  <td className="p-4">{loan.status || "â€”"}</td>
                   <td className="p-4">
                     <Link
                       to={`/soft-loans/view/${loan.id}`}
@@ -360,12 +387,16 @@ export default function SoftLoans() {
                   {money(getRecovered(loan))}
                 </p>
                 <p>
+                  <span className="font-medium">Imdaad: </span>
+                  {money(getImdaad(loan))}
+                </p>
+                <p>
                   <span className="font-medium">Pending: </span>
                   {money(getPending(loan))}
                 </p>
                 <p>
                   <span className="font-medium">Status: </span>
-                  {loan.status || "—"}
+                  {loan.status || "â€”"}
                 </p>
               </div>
 
@@ -397,3 +428,12 @@ function Card({
     </div>
   );
 }
+
+
+
+
+
+
+
+
+

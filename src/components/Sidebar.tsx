@@ -1,4 +1,4 @@
-import { Link, useLocation } from "react-router-dom";
+﻿import { Link, useLocation } from "react-router-dom";
 
 interface SidebarProps {
   open: boolean;
@@ -32,6 +32,7 @@ export default function Sidebar({
       { label: "Payments", to: "/payments" },
       { label: "Soft Loans", to: "/soft-loans" },
       { label: "Soft Loan Dashboard", to: "/soft-loan-dashboard" },
+      { label: "Imdaad Management", to: "/soft-loans/imdaad" },
       { label: "Donors", to: "/donors" },
       { label: "Donor Dashboard", to: "/donor-dashboard" },
       { label: "All Documents", to: "/documents/all" },
@@ -95,7 +96,7 @@ export default function Sidebar({
           onClick={() => setOpen(!open)}
           className="text-xl hover:text-gray-300"
         >
-          ☰
+          â˜°
         </button>
       </div>
 
@@ -144,7 +145,7 @@ export default function Sidebar({
           onClick={handleClose}
           className="block w-full text-center py-3 rounded-xl bg-red-600 hover:bg-red-700 text-sm font-medium"
         >
-          {open ? "Logout" : "⎋"}
+          {open ? "Logout" : "âŽ‹"}
         </Link>
       </div>
     </aside>

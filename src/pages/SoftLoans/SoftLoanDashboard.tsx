@@ -1,4 +1,4 @@
-
+﻿
 import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabaseClient";
 
@@ -22,6 +22,11 @@ type Loan = {
   status: string | null;
 };
 
+type ImdaadApproval = {
+  id: string;
+  loan_id: string;
+  approved_amount: number | string;
+};
 type Installment = {
   id: string;
   loan_id: string;
@@ -33,6 +38,7 @@ type Installment = {
 export default function SoftLoanDashboard() {
   const [loans, setLoans] = useState<Loan[]>([]);
   const [installments, setInstallments] = useState<Installment[]>([]);
+  const [imdaadApprovals, setImdaadApprovals] = useState<ImdaadApproval[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
 
@@ -45,18 +51,21 @@ export default function SoftLoanDashboard() {
     setLoadError(false);
 
     try {
-      const [loanRes, instRes] = await Promise.all([
+      const [loanRes, instRes, imdaadRes] = await Promise.all([
         supabase.from("soft_loans").select("id, amount, status"),
         supabase
           .from("soft_loan_installments")
           .select("id, loan_id, amount, date, notes"),
+        supabase.from("soft_loan_imdaad").select("id, loan_id, approved_amount"),
       ]);
 
       if (loanRes.error) throw loanRes.error;
       if (instRes.error) throw instRes.error;
+      if (imdaadRes.error) throw imdaadRes.error;
 
       setLoans(loanRes.data || []);
       setInstallments(instRes.data || []);
+      setImdaadApprovals(imdaadRes.data || []);
     } catch (error) {
       console.error("Failed to load soft loan dashboard:", error);
       setLoadError(true);
@@ -131,7 +140,12 @@ export default function SoftLoanDashboard() {
     0
   );
 
-  const pending = Math.max(0, totalLoan - recovered);
+  const totalImdaad = imdaadApprovals.reduce(
+    (sum, approval) => sum + Math.max(0, Number(approval.approved_amount || 0)),
+    0
+  );
+
+  const pending = Math.max(0, totalLoan - recovered - totalImdaad);
 
   const defaulters = loans.filter(
     (loan) => loan.status === "Defaulter"
@@ -199,6 +213,7 @@ export default function SoftLoanDashboard() {
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
         <Card title="Total Loan" value={formatCurrency(totalLoan)} />
         <Card title="Recovered" value={formatCurrency(recovered)} />
+        <Card title="Total Imdaad" value={formatCurrency(totalImdaad)} />
         <Card title="Pending" value={formatCurrency(pending)} />
         <Card title="Defaulters" value={defaulters} danger />
         <Card title="Active" value={activeLoans} />
@@ -335,3 +350,10 @@ function Empty() {
     </div>
   );
 }
+
+
+
+
+
+
+

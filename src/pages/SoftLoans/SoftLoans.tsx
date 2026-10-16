@@ -122,8 +122,15 @@ export default function SoftLoans() {
     );
   };
 
-  const getImdaad = (loan: SoftLoan) =>
-    imdaadApprovals
+  // Imdaad is recorded separately from cash recovery and cannot exceed
+  // the loan balance remaining after actual repayments.
+  const getImdaad = (loan: SoftLoan) => {
+    const remainingAfterRecovery = Math.max(
+      0,
+      Number(loan.amount || 0) - getRecovered(loan)
+    );
+
+    const approved = imdaadApprovals
       .filter((approval) => approval.loan_id === loan.id)
       .reduce(
         (sum, approval) =>
@@ -131,11 +138,38 @@ export default function SoftLoans() {
         0
       );
 
+    return Math.min(remainingAfterRecovery, approved);
+  };
+
   const getPending = (loan: SoftLoan) =>
     Math.max(
       0,
-      Number(loan.amount || 0) - getRecovered(loan) - getImdaad(loan)
+      Number(loan.amount || 0) -
+        getRecovered(loan) -
+        getImdaad(loan)
     );
+
+  const statusBadge = (status: string | null) => {
+    const colours: Record<string, string> = {
+      Defaulter: "bg-red-100 text-red-800 border-red-200",
+      "Paid on Time": "bg-green-100 text-green-800 border-green-200",
+      "Paying in Installments":
+        "bg-amber-100 text-amber-800 border-amber-200",
+      "Closed as Imdaad":
+        "bg-purple-100 text-purple-800 border-purple-200",
+    };
+
+    return (
+      <span
+        className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${
+          colours[status || ""] ||
+          "bg-blue-100 text-blue-800 border-blue-200"
+        }`}
+      >
+        {status || "Unknown"}
+      </span>
+    );
+  };
 
 
   const filtered = loans.filter((loan) => {
@@ -322,7 +356,7 @@ export default function SoftLoans() {
                     />
                   </td>
                   <td className="p-4 font-medium">{loan.name}</td>
-                  <td className="p-4">{loan.phone || "â€”"}</td>
+                  <td className="p-4">{loan.phone || "-,"}</td>
                   <td className="p-4 text-green-700 font-semibold">
                     {money(Number(loan.amount || 0))}
                   </td>
@@ -335,7 +369,7 @@ export default function SoftLoans() {
                   <td className="p-4 text-orange-700">
                     {money(getPending(loan))}
                   </td>
-                  <td className="p-4">{loan.status || "â€”"}</td>
+                  <td className="p-4">{statusBadge(loan.status)}</td>
                   <td className="p-4">
                     <Link
                       to={`/soft-loans/view/${loan.id}`}
@@ -396,7 +430,7 @@ export default function SoftLoans() {
                 </p>
                 <p>
                   <span className="font-medium">Status: </span>
-                  {loan.status || "â€”"}
+                  {statusBadge(loan.status)}
                 </p>
               </div>
 

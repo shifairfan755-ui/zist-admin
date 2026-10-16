@@ -11,6 +11,7 @@ export default function ViewSoftLoan() {
 
   const [loan, setLoan] = useState<any>(null);
   const [installments, setInstallments] = useState<any[]>([]);
+  const [imdaadApprovals, setImdaadApprovals] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -19,7 +20,7 @@ export default function ViewSoftLoan() {
 
   const loadData = async () => {
     setLoading(true);
-    await Promise.all([loadLoan(), loadInstallments()]);
+    await Promise.all([loadLoan(), loadInstallments(), loadImdaad()]);
     setLoading(false);
   };
 
@@ -53,6 +54,22 @@ export default function ViewSoftLoan() {
     }
 
     setInstallments(data || []);
+  };
+
+  const loadImdaad = async () => {
+    const { data, error } = await supabase
+      .from("soft_loan_imdaad")
+      .select("id, loan_id, approved_amount")
+      .eq("loan_id", id);
+
+    if (error) {
+      console.error("Could not load Imdaad records:", error);
+      toast.error("Could not load Imdaad records");
+      setImdaadApprovals([]);
+      return;
+    }
+
+    setImdaadApprovals(data || []);
   };
 
   const deleteLoan = async () => {
@@ -100,9 +117,20 @@ export default function ViewSoftLoan() {
       ? Number(loan.amount || 0)
       : Math.min(installmentTotal, Number(loan.amount || 0));
 
+  const approvedImdaad = imdaadApprovals.reduce(
+    (sum, item) =>
+      sum + Math.max(0, Number(item.approved_amount || 0)),
+    0
+  );
+
+  const totalImdaad = Math.min(
+    Math.max(0, Number(loan.amount || 0) - totalPaid),
+    approvedImdaad
+  );
+
   const remaining = Math.max(
     0,
-    Number(loan.amount || 0) - totalPaid
+    Number(loan.amount || 0) - totalPaid - totalImdaad
   );
 
   const percentPaid =
@@ -122,7 +150,7 @@ export default function ViewSoftLoan() {
       case "Paying in Installments":
         return "bg-yellow-100 text-yellow-700";
       case "Closed as Imdaad":
-        return "bg-blue-100 text-blue-700";
+        return "bg-purple-100 text-purple-800";
       default:
         return "bg-slate-100 text-slate-700";
     }
@@ -131,10 +159,10 @@ export default function ViewSoftLoan() {
   const displayValue = (value: any) =>
     value !== null && value !== undefined && String(value).trim() !== ""
       ? String(value)
-      : "—";
+      : "-";
 
   const formatDate = (value: string) => {
-    if (!value) return "—";
+    if (!value) return "-";
     return new Date(`${value}T00:00:00`).toLocaleDateString();
   };
 
@@ -144,7 +172,7 @@ export default function ViewSoftLoan() {
         to="/soft-loans"
         className="text-blue-600 text-sm font-medium"
       >
-        ← Back to Soft Loans
+        Back to Soft Loans
       </Link>
 
       <div className="mt-4 mb-6">
@@ -172,13 +200,13 @@ export default function ViewSoftLoan() {
 
               {loan.phone && (
                 <p className="text-slate-600 mt-2">
-                  ☎ {loan.phone}
+                  Phone: {loan.phone}
                 </p>
               )}
 
               {loan.address && (
                 <p className="text-slate-600 mt-1">
-                  ⌖ {loan.address}
+                  Address: {loan.address}
                 </p>
               )}
             </div>
@@ -192,22 +220,26 @@ export default function ViewSoftLoan() {
             </span>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-6">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mt-6">
             <StatCard
               label="Loan Amount"
-              value={`₹${Number(loan.amount || 0).toLocaleString()}`}
+              value={`Rs.${Number(loan.amount || 0).toLocaleString()}`}
             />
             <StatCard
               label="Recovered"
-              value={`₹${totalPaid.toLocaleString()}`}
+              value={`Rs.${totalPaid.toLocaleString()}`}
+            />
+            <StatCard
+              label="Imdaad"
+              value={`Rs.${totalImdaad.toLocaleString("en-IN")}`}
             />
             <StatCard
               label="Balance"
-              value={`₹${remaining.toLocaleString()}`}
+              value={`Rs.${remaining.toLocaleString("en-IN")}`}
             />
             <StatCard
               label="Date"
-              value={loan.loan_date ? new Date(loan.loan_date).toLocaleDateString() : "—"}
+              value={loan.loan_date ? new Date(loan.loan_date).toLocaleDateString() : "-"}
             />
           </div>
 
@@ -256,7 +288,7 @@ export default function ViewSoftLoan() {
             </Link>
 
             <button
-              onClick={() => generateLoanPDF(loan, installments)}
+              onClick={() => generateLoanPDF(loan, installments, totalImdaad)}
               className="w-full px-4 py-3 rounded-xl bg-purple-600 text-white hover:bg-purple-700"
             >
               Download PDF
@@ -314,7 +346,7 @@ export default function ViewSoftLoan() {
                       {formatDate(item.date)}
                     </td>
                     <td className="p-3 font-semibold text-green-700 whitespace-nowrap">
-                      ₹{Number(item.amount || 0).toLocaleString()}
+                      Rs.{Number(item.amount || 0).toLocaleString()}
                     </td>
                     <td className="p-3">{displayValue(item.payment_mode)}</td>
                     <td className="p-3">{displayValue(item.reference_number)}</td>
@@ -348,7 +380,7 @@ export default function ViewSoftLoan() {
               <div key={item.id} className="border rounded-xl p-4 space-y-2">
                 <div className="flex justify-between items-start gap-3">
                   <p className="font-semibold text-green-700">
-                    ₹{Number(item.amount || 0).toLocaleString()}
+                    Rs.{Number(item.amount || 0).toLocaleString()}
                   </p>
                   <p className="text-sm text-slate-500">
                     {formatDate(item.date)}
@@ -384,7 +416,7 @@ function DetailRow({ label, value }: { label: string; value: any }) {
       <span className="text-slate-800 break-words">
         {value !== null && value !== undefined && String(value).trim() !== ""
           ? String(value)
-          : "—"}
+          : "-"}
       </span>
     </div>
   );

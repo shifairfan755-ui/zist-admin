@@ -96,7 +96,7 @@ export default function Sidebar({
           onClick={() => setOpen(!open)}
           className="text-xl hover:text-gray-300"
         >
-          â˜°
+          ☰
         </button>
       </div>
 
@@ -145,7 +145,7 @@ export default function Sidebar({
           onClick={handleClose}
           className="block w-full text-center py-3 rounded-xl bg-red-600 hover:bg-red-700 text-sm font-medium"
         >
-          {open ? "Logout" : "âŽ‹"}
+          {open ? "Logout" : "↪"}
         </Link>
       </div>
     </aside>

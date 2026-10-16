@@ -1,7 +1,11 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
-export const generateLoanPDF = (loan: any, installments: any[]) => {
+export const generateLoanPDF = (
+  loan: any,
+  installments: any[],
+  imdaadAmount = 0
+) => {
   const doc = new jsPDF({
     orientation: "portrait",
     unit: "mm",
@@ -24,7 +28,15 @@ export const generateLoanPDF = (loan: any, installments: any[]) => {
       ? loanAmount
       : Math.min(installmentTotal, loanAmount);
 
-  const balance = Math.max(0, loanAmount - totalPaid);
+  const totalImdaad = Math.min(
+    Math.max(0, loanAmount - totalPaid),
+    Math.max(0, Number(imdaadAmount || 0))
+  );
+
+  const balance = Math.max(
+    0,
+    loanAmount - totalPaid - totalImdaad
+  );
 
   const formatAmount = (value: number) =>
     "Rs. " +
@@ -108,7 +120,7 @@ export const generateLoanPDF = (loan: any, installments: any[]) => {
   doc.text("Financial Summary", left, 92);
 
   const boxGap = 3;
-  const boxWidth = (contentWidth - boxGap * 2) / 3;
+  const boxWidth = (contentWidth - boxGap * 3) / 4;
 
   const drawBox = (
     x: number,
@@ -125,16 +137,25 @@ export const generateLoanPDF = (loan: any, installments: any[]) => {
     doc.text(title, x + 2.5, 104);
 
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(9);
+    doc.setFontSize(8);
     doc.setTextColor(0, 0, 0);
     doc.text(value, x + 2.5, 112);
   };
 
   drawBox(left, "Loan Amount", formatAmount(loanAmount));
-  drawBox(left + boxWidth + boxGap, "Recovered", formatAmount(totalPaid));
+  drawBox(
+    left + boxWidth + boxGap,
+    "Recovered",
+    formatAmount(totalPaid)
+  );
   drawBox(
     left + (boxWidth + boxGap) * 2,
-    "Outstanding Balance",
+    "Imdaad",
+    formatAmount(totalImdaad)
+  );
+  drawBox(
+    left + (boxWidth + boxGap) * 3,
+    "Outstanding",
     formatAmount(balance)
   );
 

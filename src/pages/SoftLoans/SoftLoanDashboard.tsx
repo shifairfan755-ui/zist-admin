@@ -1,4 +1,4 @@
-﻿
+
 import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabaseClient";
 
@@ -140,12 +140,45 @@ export default function SoftLoanDashboard() {
     0
   );
 
-  const totalImdaad = imdaadApprovals.reduce(
-    (sum, approval) => sum + Math.max(0, Number(approval.approved_amount || 0)),
+  const imdaadByLoan = imdaadApprovals.reduce<Record<string, number>>(
+    (totals, approval) => {
+      const loanId = String(approval.loan_id);
+      totals[loanId] =
+        (totals[loanId] || 0) +
+        Math.max(0, Number(approval.approved_amount || 0));
+      return totals;
+    },
+    {}
+  );
+
+  const getImdaad = (loan: Loan) => {
+    const remainingAfterRecovery = Math.max(
+      0,
+      Number(loan.amount || 0) - getRecovered(loan)
+    );
+
+    return Math.min(
+      remainingAfterRecovery,
+      imdaadByLoan[String(loan.id)] || 0
+    );
+  };
+
+  const totalImdaad = loans.reduce(
+    (sum, loan) => sum + getImdaad(loan),
     0
   );
 
-  const pending = Math.max(0, totalLoan - recovered - totalImdaad);
+  const pending = loans.reduce(
+    (sum, loan) =>
+      sum +
+      Math.max(
+        0,
+        Number(loan.amount || 0) -
+          getRecovered(loan) -
+          getImdaad(loan)
+      ),
+    0
+  );
 
   const defaulters = loans.filter(
     (loan) => loan.status === "Defaulter"
@@ -186,13 +219,21 @@ export default function SoftLoanDashboard() {
     ([name, value]) => ({ name, value })
   );
 
-  const COLORS = [
-    "#16a34a",
-    "#dc2626",
-    "#f59e0b",
-    "#2563eb",
-    "#64748b",
-  ];
+  // Assign colours by status name so chart ordering cannot change meanings.
+  const getStatusColour = (status: string) => {
+    switch (status) {
+      case "Defaulter":
+        return "#dc2626";
+      case "Paid on Time":
+        return "#16a34a";
+      case "Paying in Installments":
+        return "#f59e0b";
+      case "Closed as Imdaad":
+        return "#9333ea";
+      default:
+        return "#2563eb";
+    }
+  };
 
   const formatCurrency = (amount: number) =>
     `₹${amount.toLocaleString("en-IN", {
@@ -210,7 +251,7 @@ export default function SoftLoanDashboard() {
         </p>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 mb-6">
         <Card title="Total Loan" value={formatCurrency(totalLoan)} />
         <Card title="Recovered" value={formatCurrency(recovered)} />
         <Card title="Total Imdaad" value={formatCurrency(totalImdaad)} />
@@ -266,10 +307,10 @@ export default function SoftLoanDashboard() {
                     outerRadius={100}
                     label
                   >
-                    {statusData.map((_, index) => (
+                    {statusData.map((item) => (
                       <Cell
-                        key={index}
-                        fill={COLORS[index % COLORS.length]}
+                        key={item.name}
+                        fill={getStatusColour(item.name)}
                       />
                     ))}
                   </Pie>
@@ -314,16 +355,23 @@ function Card({
   value: string | number;
   danger?: boolean;
 }) {
+  const accent =
+    danger || title === "Defaulters"
+      ? "border-red-200 bg-red-50 text-red-700"
+      : title === "Recovered"
+        ? "border-green-200 bg-green-50 text-green-700"
+        : title === "Total Imdaad"
+          ? "border-purple-200 bg-purple-50 text-purple-700"
+          : title === "Pending"
+            ? "border-amber-200 bg-amber-50 text-amber-800"
+            : title === "Active"
+              ? "border-blue-200 bg-blue-50 text-blue-700"
+              : "border-slate-200 bg-white text-slate-800";
+
   return (
-    <div className="bg-white rounded-2xl shadow p-4">
-      <p className="text-xs text-slate-500">{title}</p>
-      <h3
-        className={`text-lg font-bold mt-1 ${
-          danger ? "text-red-600" : "text-slate-800"
-        }`}
-      >
-        {value}
-      </h3>
+    <div className={`rounded-2xl border shadow-sm p-4 ${accent}`}>
+      <p className="text-xs opacity-80">{title}</p>
+      <h3 className="text-lg font-bold mt-1 break-words">{value}</h3>
     </div>
   );
 }
